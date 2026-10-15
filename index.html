@@ -126,7 +126,7 @@ function stats(cells,MG,per){const o={};for(const k in cells){const m=MG[cells[k
 function assignRefs(M,per,total){G.refs={};const cnt={};
  for(let t=0;t<total;t++){const ms=Object.entries(G.cells).filter(([k])=>k.split('-')[0]==t).map(([,g])=>M.find(m=>m.g==g)).filter(Boolean),bz=new Set(ms.flatMap(tsOf));
   ms.forEach(m=>{if(m.c.mode=='tour'&&m.r>0){G.refs[m.g]='直前試合の敗者';return}
-   const p=m.c.slots.filter(x=>x!=null).map(x=>m.c.id+'|'+m.c.teams[x]).filter(k=>!bz.has(k)).sort((a,b)=>(cnt[a]||0)-(cnt[b]||0))[0];
+   const p=m.c.slots.filter(x=>x!=null).map(x=>m.c.id+'|'+m.c.teams[x]).filter(k=>!bz.has(k)).sort(()=>Math.random()-.5).sort((a,b)=>(cnt[a]||0)-(cnt[b]||0))[0];
    if(p){G.refs[m.g]=p.slice(p.indexOf('|')+1);cnt[p]=(cnt[p]||0)+1;bz.add(p)}})}}
 const pname=kd=>{const i=kd.lastIndexOf('@'),k=kd.slice(0,i),j=k.indexOf('|'),c=G.comps.find(x=>x.id==k.slice(0,j));return(c?c.name:'')+' '+k.slice(j+1)+' '+kd.slice(i+1)+'日目'};
 function refStats(cells,MG,per,refs){const o={};for(const k in cells){const m=MG[cells[k]];if(!m)continue;const n=(refs||G.refs)[m.g];if(!m.c.teams.includes(n))continue;const t=+k.split('-')[0],kd=m.c.id+'|'+n+'@'+(Math.floor(t/per)+1);(o[kd]=o[kd]||[]).push(t%per+1)}return o}
@@ -153,11 +153,11 @@ function runOpt(M,per,total){let n=0;do{runOpt1(M,per,total);n++}while(omsg.incl
 function runOpt1(M,per,total){G.pins=G.pins||{};const MG={};M.forEach(m=>{MG[m.g]=m;m.ts=tsOf(m);m.dp=dpOf(m)});
  const keys=[];for(let t=0;t<total;t++)for(let c=0;c<G.courts;c++)keys.push(t+'-'+c);
  const orig={...G.cells},rs=G.rules.map(r=>{const x=G.comps.find(z=>z.id==r.c);return x&&{k:x.id+'|'+x.teams[r.t],p:r.p,d:r.d}}).filter(Boolean);
- const valid=cells=>{let v=0;const at={},sl={};
+ const valid=cells=>{let v=0;const at={},sl={},nd={},bs={};
   for(const k in cells){const g=cells[k],m=MG[g];if(!m){v++;continue}const[t,c]=k.split('-').map(Number);
    if((m.c.court&&m.c.court!=String(c))||!winOk(m,t,per))v++;
-   at[g]=t;const u=sl[t]||(sl[t]=new Set());m.ts.forEach(x=>{if(u.has(x))v++;u.add(x)})}
-  for(const g in at)MG[g].dp.forEach(d=>{if(at[d]===undefined||at[d]>=at[g])v++});return v};
+   at[g]=t;const u=sl[t]||(sl[t]=new Set()),ck=m.c.id+'@'+t;if(!(m.c.mode=='tour'&&m.r>0))nd[ck]=(nd[ck]||0)+1;m.ts.forEach(x=>{if(u.has(x))v++;u.add(x);bs[ck]=(bs[ck]||0)+1})}
+  for(const g in at)MG[g].dp.forEach(d=>{if(at[d]===undefined||at[d]>=at[g])v++});for(const k in nd){const c=G.comps.find(z=>z.id==k.split('@')[0]);if(c.slots.filter(x=>x!=null).length-(bs[k]||0)<nd[k])v++}return v};
  const cost=cells=>{const st=stats(cells,MG,per),occ={};let c=0;for(const k in cells){const m0=MG[cells[k]];if(m0)occ[m0.c.id+'@'+k.split('-')[0]]=1}
   for(const kd in G.pins){const p=G.pins[kd],r=st[kd]||[],f=r.length?Math.min(...r):0,l=r.length?Math.max(...r):0;
    if(p.f&&f!=p.f)c+=1000+50*Math.abs(f-p.f);if(p.l&&l!=p.l)c+=1000+50*Math.abs(l-p.l);
@@ -182,22 +182,33 @@ function runOpt1(M,per,total){G.pins=G.pins||{};const MG={};M.forEach(m=>{MG[m.g
   if(p.rf&&f!=p.rf)er.push(`${pname(kd)}: 審判の初回を第${p.rf}試合にできません(最も近い案: ${f?'第'+f+'試合':'審判なし'})`);
   if(p.rl&&l!=p.rl)er.push(`${pname(kd)}: 審判の最終を第${p.rl}試合にできません(最も近い案: ${l?'第'+l+'試合':'審判なし'})`)}
  omsg=er.length?'<div id="msg">⚠ 次の指定は実現できませんでした(他の指定、コート・時間帯の制限、試合数と両立しません):<br>'+er.map(esc).join('<br>')+'<br>数字を変更して、もう一度「最適化」を押してください。</div>':'<div style="color:var(--ac)">✅ すべての指定を満たす日程になりました。</div>';
+ {const ms=missing(M);if(ms.length)omsg+='<div id="msg">⚠ 審判を割り当てられない試合: '+esc(ms.map(m=>m.c.name+' 第'+m.no+'試合').join('、'))+'</div>'}
  upd()}
-function gen(){const M=allM(),per=Math.floor((tmin(G.end)-tmin(G.start))/G.dur),total=per*G.days;G.cells={};G.refs={};G.pins=G.pins||{};omsg='';$('#msg').textContent='';
+function missing(M){return Object.values(G.cells).map(g=>M.find(m=>m.g==g)).filter(m=>m&&!G.refs[m.g])}
+function gen(){const M=allM(),per=Math.floor((tmin(G.end)-tmin(G.start))/G.dur),total=per*G.days;let b=null;
+ for(let i=0;i<60;i++){const ov=gen1();if(ov===undefined)return;const n=missing(M).length;
+  if(!b||ov<b.ov||(ov==b.ov&&n<b.n))b={ov,n,cells:{...G.cells},refs:{...G.refs}};if(!b.ov&&!b.n)break}
+ G.cells=b.cells;G.refs=b.refs;const msg=[];
+ if(b.ov)msg.push(`時間内に入りきらない試合が${b.ov}試合あります(日数・終了時刻・コート数を調整してください。審判を出せるチームが足りず組めなかった可能性もあります)。`);
+ G.comps.filter(c=>c.inc&&c.slots.filter(x=>x!=null).length<3).forEach(c=>msg.push('⚠ '+c.name+'は審判を出せるチームがいません(3チーム以上必要です)。'));
+ const ms=missing(M);if(ms.length)msg.push('⚠ 審判を割り当てられない試合が'+ms.length+'試合あります: '+ms.map(m=>m.c.name+' 第'+m.no+'試合').join('、')+'。同じ大会の中で、その時間に試合のないチームがいません。コート数を減らす、時間枠を増やす、チームを増やすなどで調整してください。');
+ $('#msg').textContent=msg.join(' ');
+ if(Object.keys(G.pins||{}).length)runOpt(M,per,total);else upd()}
+function gen1(){const M=allM(),per=Math.floor((tmin(G.end)-tmin(G.start))/G.dur),total=per*G.days;G.cells={};G.refs={};G.pins=G.pins||{};omsg='';$('#msg').textContent='';
  if(!M.length){$('#msg').textContent='日程に入れる大会を選んでください。';rSched();return}
- const at={},last={},todo=[...M],dn={},tot={},cdn={};
+ const at={},last={},todo=[...M],dn={},tot={},cdn={},pl={};
  const qt=c=>{if(c.mode=='tour')return 99;const nd=Math.max(1,Math.min(G.days,+(c.td||G.days))-Math.max(1,+(c.fd||1))+1);return Math.ceil((c.teams.length-1)/nd)};M.forEach(m=>{tot[m.c.id]=(tot[m.c.id]||0)+1;dn[m.c.id]=0});
  const rs=G.rules.map(r=>{const x=G.comps.find(z=>z.id==r.c);return x&&{k:x.id+'|'+x.teams[r.t],p:r.p,d:r.d}}).filter(Boolean);
  const ts=m=>[tm(m.c,m.a).k,tm(m.c,m.b).k].filter(Boolean),dp=m=>[m.a,m.b].filter(s=>s.m&&!s.m.bye).map(s=>m.c.id+':'+s.m.no);
  const win=(m,t)=>{const dy=Math.floor(t/per)+1;if((m.c.fd&&dy<+m.c.fd)||(m.c.td&&dy>+m.c.td))return false;const st=tmin(G.start)+(t%per)*G.dur;return(!m.c.from||st>=tmin(m.c.from))&&(!m.c.to||st+G.dur<=tmin(m.c.to))};
- for(let t=0;t<total&&todo.length;t++){const busy=new Set();
+ for(let t=0;t<total&&todo.length;t++){const busy=new Set(),bcn={},ncn={};
+  const refOk=m=>{const id=m.c.id,pc=pl[id]??(pl[id]=m.c.slots.filter(x=>x!=null).length);return pc-((bcn[id]||0)+ts(m).length)>=((ncn[id]||0)+((m.c.mode=='tour'&&m.r>0)?0:1))};
   for(let c=0;c<G.courts;c++){
-   const cd=todo.filter(m=>win(m,t)&&(m.c.court===''||m.c.court==String(c))&&dp(m).every(d=>at[d]<t)&&ts(m).every(x=>!busy.has(x)));if(!cd.length)continue;
-   const sc=m=>{const x=ts(m),day=Math.floor(t/per)+1,hit=p=>x.some(y=>rs.some(r=>r.p==p&&r.k==y&&(!r.d||r.d==day)));return(m.c.from||m.c.to||m.c.fd||m.c.td?-200:0)+(hit('first')?-1e4:0)+(hit('last')?1e4:0)+m.r*10+dn[m.c.id]/tot[m.c.id]*20+x.reduce((s,y)=>s+(last[y]===t-1?30:0),0)+x.reduce((s,y)=>{const n=cdn[y+'@'+day]||0;return s+n*40+(n>=qt(m.c)?300:0)},0)};
-   cd.sort((a,b)=>sc(a)-sc(b));const m=cd[0];G.cells[t+'-'+c]=m.g;at[m.g]=t;dn[m.c.id]++;ts(m).forEach(x=>{busy.add(x);last[x]=t;const k=x+'@'+(Math.floor(t/per)+1);cdn[k]=(cdn[k]||0)+1});todo.splice(todo.indexOf(m),1)}}
+   const cd=todo.filter(m=>win(m,t)&&refOk(m)&&(m.c.court===''||m.c.court==String(c))&&dp(m).every(d=>at[d]<t)&&ts(m).every(x=>!busy.has(x)));if(!cd.length)continue;
+   const sc=m=>{const x=ts(m),day=Math.floor(t/per)+1,hit=p=>x.some(y=>rs.some(r=>r.p==p&&r.k==y&&(!r.d||r.d==day)));return(m.c.from||m.c.to||m.c.fd||m.c.td?-200:0)+(hit('first')?-1e4:0)+(hit('last')?1e4:0)+m.r*10+Math.random()*60+dn[m.c.id]/tot[m.c.id]*20+x.reduce((s,y)=>s+(last[y]===t-1?30:0),0)+x.reduce((s,y)=>{const n=cdn[y+'@'+day]||0;return s+n*40+(n>=qt(m.c)?300:0)},0)};
+   cd.sort((a,b)=>sc(a)-sc(b));const m=cd[0];bcn[m.c.id]=(bcn[m.c.id]||0)+ts(m).length;if(!(m.c.mode=='tour'&&m.r>0))ncn[m.c.id]=(ncn[m.c.id]||0)+1;G.cells[t+'-'+c]=m.g;at[m.g]=t;dn[m.c.id]++;ts(m).forEach(x=>{busy.add(x);last[x]=t;const k=x+'@'+(Math.floor(t/per)+1);cdn[k]=(cdn[k]||0)+1});todo.splice(todo.indexOf(m),1)}}
  assignRefs(M,per,total);
- if(todo.length)$('#msg').textContent=`時間内に入りきらない試合が${todo.length}試合あります(日数・終了時刻・コート数を調整してください)。`;
- if(Object.keys(G.pins||{}).length)runOpt(M,per,total);else upd()}
+ return todo.length}
 function rSched(){const M=allM(),per=Math.floor((tmin(G.end)-tmin(G.start))/G.dur);let h='';
  if(!Object.keys(G.cells).length){$('#sched').innerHTML='<p class="mu">「日程を作成」を押してください。</p>';return}
  for(let d=0;d<G.days;d++){h+=`<h3>${d+1}日目</h3><div class="sc"><table><tr><th></th>`+Array.from({length:G.courts},(_,c)=>`<th>${String.fromCharCode(65+c)}コート</th>`).join('')+'</tr>';
@@ -213,7 +224,7 @@ function rSched(){const M=allM(),per=Math.floor((tmin(G.end)-tmin(G.start))/G.du
   G.comps.filter(c=>c.inc).forEach(c=>c.teams.forEach(t=>{for(let d=1;d<=G.days;d++){const kd=c.id+'|'+t+'@'+d,r=st[kd],p=G.pins[kd]||{};const q=rt[kd];if(!r&&!q&&!p.f&&!p.l&&!p.rf&&!p.rl)continue;
    const f=r?Math.min(...r):'',l=r?Math.max(...r):'',rf=q?Math.min(...q):'',rl=q?Math.max(...q):'',inp=(a,v,act)=>`<input type="number" min="1" max="${per}" data-p${a}="${esc(kd)}" value="${v}" class="${v!==''&&v!=act?'bad':''}">`;
    rw+=`<tr><td>${esc(c.name)}</td><td>${esc(t)}</td><td>${d}日目</td><td>${r?r.length:0}</td><td>${inp('f',p.f||f,f)}</td><td>${inp('l',p.l||l,l)}</td><td>${q?q.length:0}</td><td>${inp('rf',p.rf||rf,rf)}</td><td>${inp('rl',p.rl||rl,rl)}</td></tr>`}}));
-  h+=`<h3>チーム別の出場順の指定</h3><div class="mu">各チームの、その日の最初と最後の試合、および審判を務める最初と最後が「第何試合目」かを書き出しています。数字を書き換えて「最適化」を押すと、その指定になるよう日程を組み直します(実現できない指定はエラーを表示します)。赤い欄は、まだ指定どおりになっていない欄です。</div><div class="row"><button id="opt">この指定で最適化</button><button class="s" id="pclr">指定をすべて解除</button></div><div id="omsg">${omsg}</div><div class="sc" id="pt"><table><tr><th>大会</th><th>チーム</th><th>日</th><th>試合数</th><th>初戦(第○試合)</th><th>最終戦(第○試合)</th><th>審判回数</th><th>審判の初回(第○試合)</th><th>審判の最終(第○試合)</th></tr>${rw}</table></div>`}
+  h+=`<h3>チーム別の出場順の指定</h3><div class="mu">各チームの、その日の最初と最後の試合、および審判を務める最初と最後が「第何試合目」かを書き出しています。数字を書き換えて「最適化」を押すと、その指定になるよう日程を組み直します(実現できない指定はエラーを表示します)。赤い欄は、まだ指定どおりになっていない欄です。日程表のカードをドラッグしたり審判欄を書き換えたあとは、「手書きの変更を反映」を押すと、この表の数字が最新になります。</div><div class="row"><button id="opt">この指定で最適化</button><button class="s" id="rfl">手書きの変更を反映</button><button class="s" id="pclr">指定をすべて解除</button></div><div id="omsg">${omsg}</div><div class="sc" id="pt"><table><tr><th>大会</th><th>チーム</th><th>日</th><th>試合数</th><th>初戦(第○試合)</th><th>最終戦(第○試合)</th><th>審判回数</th><th>審判の初回(第○試合)</th><th>審判の最終(第○試合)</th></tr>${rw}</table></div>`}
  $('#sched').innerHTML=h}
 function xl(){const M=allM(),per=Math.floor((tmin(G.end)-tmin(G.start))/G.dur),rows=[];let h='';const cn=c=>String.fromCharCode(65+c)+'コート',cs=Array.from({length:G.courts},(_,c)=>c);
  for(let d=0;d<G.days;d++){rows.push([d+1+'日目']);h+=`<tr><td colspan="${2+5*G.courts}" style="text-align:left;font-weight:700">${d+1}日目</td></tr>`;
@@ -255,6 +266,9 @@ document.addEventListener('click',e=>{const g=s=>e.target.closest(s),c=cur();
  else if(g('#fill')){fill(c);upd()}
  else if(g('#gen'))gen();
  else if(g('#opt')){const M=allM(),per=Math.floor((tmin(G.end)-tmin(G.start))/G.dur);if(Object.keys(G.pins||{}).length)runOpt(M,per,per*G.days);else{omsg='<div>指定がありません。数字を書き換えてから押してください。</div>';rSched()}}
+ else if(g('#rfl')){const per=Math.floor((tmin(G.end)-tmin(G.start))/G.dur),M=allM(),MG={};M.forEach(m=>MG[m.g]=m);const st=stats(G.cells,MG,per),rt=refStats(G.cells,MG,per);G.pins=G.pins||{};
+  for(const kd in G.pins){const p=G.pins[kd],r=st[kd],q=rt[kd];[['f',r,Math.min],['l',r,Math.max],['rf',q,Math.min],['rl',q,Math.max]].forEach(([f,a,fn])=>{if(p[f]){if(a)p[f]=fn(...a);else delete p[f]}});if(!['f','l','rf','rl'].some(k=>p[k]))delete G.pins[kd]}
+  omsg='<div>手書きの変更を反映しました。</div>';upd()}
  else if(g('#pclr')){G.pins={};omsg='';upd()}
  else if(g('#ra')){const[a,b]=$('#rt').value.split('|');G.rules.push({c:+a,t:+b,p:$('#rp').value,d:$('#rd').value});upd()}
  else if(g('[data-rm]')){G.rules.splice(+g('[data-rm]').dataset.rm,1);upd()}
