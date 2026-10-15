@@ -129,7 +129,28 @@ function assignRefs(M,per,total){G.refs={};const cnt={};
    const p=m.c.slots.filter(x=>x!=null).map(x=>m.c.id+'|'+m.c.teams[x]).filter(k=>!bz.has(k)).sort((a,b)=>(cnt[a]||0)-(cnt[b]||0))[0];
    if(p){G.refs[m.g]=p.slice(p.indexOf('|')+1);cnt[p]=(cnt[p]||0)+1;bz.add(p)}})}}
 const pname=kd=>{const i=kd.lastIndexOf('@'),k=kd.slice(0,i),j=k.indexOf('|'),c=G.comps.find(x=>x.id==k.slice(0,j));return(c?c.name:'')+' '+k.slice(j+1)+' '+kd.slice(i+1)+'日目'};
-function runOpt(M,per,total){G.pins=G.pins||{};const MG={};M.forEach(m=>{MG[m.g]=m;m.ts=tsOf(m);m.dp=dpOf(m)});
+function refStats(cells,MG,per,refs){const o={};for(const k in cells){const m=MG[cells[k]];if(!m)continue;const n=(refs||G.refs)[m.g];if(!m.c.teams.includes(n))continue;const t=+k.split('-')[0],kd=m.c.id+'|'+n+'@'+(Math.floor(t/per)+1);(o[kd]=o[kd]||[]).push(t%per+1)}return o}
+function optRefs(M,per,total,MG){const busy={},cand={},slot={};
+ for(const k in G.cells){const m=MG[G.cells[k]],t=+k.split('-')[0];if(!m)continue;slot[m.g]=t;const b=busy[t]||(busy[t]=new Set());(m.ts||tsOf(m)).forEach(x=>b.add(x))}
+ const ids=[];for(const g in slot){const m=MG[g];if(m.c.mode=='tour'&&m.r>0)continue;
+  const c=m.c.slots.filter(x=>x!=null).map(x=>m.c.teams[x]).filter(n=>!busy[slot[g]].has(m.c.id+'|'+n));if(c.length){cand[g]=c;ids.push(g)}}
+ if(!ids.length)return;
+ const ref={...G.refs};ids.forEach(g=>{if(!cand[g].includes(ref[g]))ref[g]=cand[g][0]});
+ const cost=()=>{const rt=refStats(G.cells,MG,per,ref),tot={},sl={};let c=0;
+  for(const g of ids){const m=MG[g],key=m.c.id+'|'+ref[g];tot[key]=(tot[key]||0)+1;const u=sl[slot[g]]||(sl[slot[g]]=new Set());if(u.has(key))c+=500;u.add(key)}
+  for(const k in tot)c+=6*tot[k]*tot[k];
+  for(const kd in G.pins){const p=G.pins[kd],r=rt[kd]||[],f=r.length?Math.min(...r):0,l=r.length?Math.max(...r):0;
+   if(p.rf&&f!=p.rf)c+=1000+50*Math.abs(f-p.rf);if(p.rl&&l!=p.rl)c+=1000+50*Math.abs(l-p.rl)}
+  for(const kd in rt){const r=rt[kd].slice().sort((a,b)=>a-b);for(let j=1;j<r.length;j++)if(r[j]-r[j-1]==1)c+=5}
+  return c};
+ let cc=cost(),best={...ref},bc=cc;const N=12000;
+ for(let i=0;i<N;i++){const T=60*Math.pow(1/60,i/N),g=ids[Math.random()*ids.length|0];let undo;
+  if(Math.random()<.5){const old=ref[g],c=cand[g];ref[g]=c[Math.random()*c.length|0];undo=()=>{ref[g]=old}}
+  else{const h=ids[Math.random()*ids.length|0];if(h==g||!cand[g].includes(ref[h])||!cand[h].includes(ref[g]))continue;const a=ref[g],b=ref[h];ref[g]=b;ref[h]=a;undo=()=>{ref[g]=a;ref[h]=b}}
+  const n=cost(),d=n-cc;if(d<=0||Math.random()<Math.exp(-d/T)){cc=n;if(cc<bc){bc=cc;best={...ref}}}else undo()}
+ G.refs=best}
+function runOpt(M,per,total){let n=0;do{runOpt1(M,per,total);n++}while(omsg.includes('⚠')&&n<8)}
+function runOpt1(M,per,total){G.pins=G.pins||{};const MG={};M.forEach(m=>{MG[m.g]=m;m.ts=tsOf(m);m.dp=dpOf(m)});
  const keys=[];for(let t=0;t<total;t++)for(let c=0;c<G.courts;c++)keys.push(t+'-'+c);
  const orig={...G.cells},rs=G.rules.map(r=>{const x=G.comps.find(z=>z.id==r.c);return x&&{k:x.id+'|'+x.teams[r.t],p:r.p,d:r.d}}).filter(Boolean);
  const valid=cells=>{let v=0;const at={},sl={};
@@ -137,9 +158,10 @@ function runOpt(M,per,total){G.pins=G.pins||{};const MG={};M.forEach(m=>{MG[m.g]
    if((m.c.court&&m.c.court!=String(c))||!winOk(m,t,per))v++;
    at[g]=t;const u=sl[t]||(sl[t]=new Set());m.ts.forEach(x=>{if(u.has(x))v++;u.add(x)})}
   for(const g in at)MG[g].dp.forEach(d=>{if(at[d]===undefined||at[d]>=at[g])v++});return v};
- const cost=cells=>{const st=stats(cells,MG,per);let c=0;
+ const cost=cells=>{const st=stats(cells,MG,per),occ={};let c=0;for(const k in cells){const m0=MG[cells[k]];if(m0)occ[m0.c.id+'@'+k.split('-')[0]]=1}
   for(const kd in G.pins){const p=G.pins[kd],r=st[kd]||[],f=r.length?Math.min(...r):0,l=r.length?Math.max(...r):0;
-   if(p.f&&f!=p.f)c+=1000+50*Math.abs(f-p.f);if(p.l&&l!=p.l)c+=1000+50*Math.abs(l-p.l)}
+   if(p.f&&f!=p.f)c+=1000+50*Math.abs(f-p.f);if(p.l&&l!=p.l)c+=1000+50*Math.abs(l-p.l);
+   for(const q of [p.rf,p.rl])if(q){const t=(+kd.slice(kd.lastIndexOf('@')+1)-1)*per+ +q-1;if(r.includes(+q)||!occ[kd.split('|')[0]+'@'+t])c+=1000}}
   for(const kd in st){const r=st[kd].slice().sort((a,b)=>a-b),i=kd.lastIndexOf('@'),tk=kd.slice(0,i),dy=kd.slice(i+1);c+=10*r.length*r.length;
    for(let j=1;j<r.length;j++)if(r[j]-r[j-1]==1)c+=8;
    rs.forEach(q=>{if(q.k==tk&&(!q.d||q.d==dy))c+=3*r.reduce((s,x)=>s+(q.p=='first'?x:per+1-x),0)})}
@@ -149,12 +171,16 @@ function runOpt(M,per,total){G.pins=G.pins||{};const MG={};M.forEach(m=>{MG[m.g]
  for(let i=0;i<N;i++){const T=60*Math.pow(1/60,i/N),a=keys[Math.random()*keys.length|0],b=keys[Math.random()*keys.length|0];
   if(a==b||(!cur[a]&&!cur[b]))continue;sw(a,b);const v=valid(cur);if(v>vc){sw(a,b);continue}
   const n=cost(cur),d=n-cc;if(d<=0||Math.random()<Math.exp(-d/T)){cc=n;vc=v;if(cc<bc){bc=cc;best={...cur}}}else sw(a,b)}
- G.cells=best;assignRefs(M,per,total);
+ G.cells=best;assignRefs(M,per,total);if(Object.values(G.pins).some(p=>p.rf||p.rl))optRefs(M,per,total,MG);
  const st=stats(G.cells,MG,per),er=[];
  for(const kd in G.pins){const p=G.pins[kd],r=st[kd]||[],f=r.length?Math.min(...r):0,l=r.length?Math.max(...r):0;
   if(p.f&&p.l&&+p.f>+p.l)er.push(`${pname(kd)}: 初戦(第${p.f}試合)が最終戦(第${p.l}試合)より後になっています`);
   else{if(p.f&&f!=p.f)er.push(`${pname(kd)}: 初戦を第${p.f}試合にできません(最も近い案: ${f?'第'+f+'試合':'試合なし'})`);
    if(p.l&&l!=p.l)er.push(`${pname(kd)}: 最終戦を第${p.l}試合にできません(最も近い案: ${l?'第'+l+'試合':'試合なし'})`)}}
+ const rt=refStats(G.cells,MG,per);
+ for(const kd in G.pins){const p=G.pins[kd],r=rt[kd]||[],f=r.length?Math.min(...r):0,l=r.length?Math.max(...r):0;
+  if(p.rf&&f!=p.rf)er.push(`${pname(kd)}: 審判の初回を第${p.rf}試合にできません(最も近い案: ${f?'第'+f+'試合':'審判なし'})`);
+  if(p.rl&&l!=p.rl)er.push(`${pname(kd)}: 審判の最終を第${p.rl}試合にできません(最も近い案: ${l?'第'+l+'試合':'審判なし'})`)}
  omsg=er.length?'<div id="msg">⚠ 次の指定は実現できませんでした(他の指定、コート・時間帯の制限、試合数と両立しません):<br>'+er.map(esc).join('<br>')+'<br>数字を変更して、もう一度「最適化」を押してください。</div>':'<div style="color:var(--ac)">✅ すべての指定を満たす日程になりました。</div>';
  upd()}
 function gen(){const M=allM(),per=Math.floor((tmin(G.end)-tmin(G.start))/G.dur),total=per*G.days;G.cells={};G.refs={};G.pins=G.pins||{};omsg='';$('#msg').textContent='';
@@ -183,11 +209,11 @@ function rSched(){const M=allM(),per=Math.floor((tmin(G.end)-tmin(G.start))/G.du
  {const cn={};G.comps.filter(c=>c.inc).forEach(c=>c.teams.forEach(t=>cn[c.id+'|'+t]={c:c.name,t,d:Array(G.days).fill(0)}));
   Object.entries(G.cells).forEach(([k,g])=>{const m=M.find(x=>x.g==g);if(!m)return;const dy=Math.floor(k.split('-')[0]/per);[m.a,m.b].forEach(s=>{const q=tm(m.c,s).k;if(q&&cn[q])cn[q].d[dy]++})});
   h+='<h3>各チームの試合数(日別)</h3><div class="sc" id="cnt"><table><tr><th>大会</th><th>チーム</th>'+Array.from({length:G.days},(_,i)=>`<th>${i+1}日目</th>`).join('')+'<th>計</th></tr>'+Object.values(cn).map(o=>`<tr><td>${esc(o.c)}</td><td>${esc(o.t)}</td>${o.d.map(n=>`<td>${n}</td>`).join('')}<td>${o.d.reduce((a,b)=>a+b,0)}</td></tr>`).join('')+'</table></div><div class="mu">トーナメントは、対戦が確定している試合だけ数えています。</div>'}
- {const MG={};M.forEach(m=>MG[m.g]=m);const st=stats(G.cells,MG,per);G.pins=G.pins||{};let rw='';
-  G.comps.filter(c=>c.inc).forEach(c=>c.teams.forEach(t=>{for(let d=1;d<=G.days;d++){const kd=c.id+'|'+t+'@'+d,r=st[kd],p=G.pins[kd]||{};if(!r&&!p.f&&!p.l)continue;
-   const f=r?Math.min(...r):'',l=r?Math.max(...r):'',inp=(a,v,act)=>`<input type="number" min="1" max="${per}" data-p${a}="${esc(kd)}" value="${v}" class="${v!==''&&v!=act?'bad':''}">`;
-   rw+=`<tr><td>${esc(c.name)}</td><td>${esc(t)}</td><td>${d}日目</td><td>${r?r.length:0}</td><td>${inp('f',p.f||f,f)}</td><td>${inp('l',p.l||l,l)}</td></tr>`}}));
-  h+=`<h3>チーム別の出場順の指定</h3><div class="mu">各チームの、その日の最初と最後の試合が「第何試合目」かを書き出しています。数字を書き換えて「最適化」を押すと、その指定になるよう日程を組み直します(実現できない指定はエラーを表示します)。赤い欄は、まだ指定どおりになっていない欄です。</div><div class="row"><button id="opt">この指定で最適化</button><button class="s" id="pclr">指定をすべて解除</button></div><div id="omsg">${omsg}</div><div class="sc" id="pt"><table><tr><th>大会</th><th>チーム</th><th>日</th><th>試合数</th><th>初戦(第○試合)</th><th>最終戦(第○試合)</th></tr>${rw}</table></div>`}
+ {const MG={};M.forEach(m=>MG[m.g]=m);const st=stats(G.cells,MG,per),rt=refStats(G.cells,MG,per);G.pins=G.pins||{};let rw='';
+  G.comps.filter(c=>c.inc).forEach(c=>c.teams.forEach(t=>{for(let d=1;d<=G.days;d++){const kd=c.id+'|'+t+'@'+d,r=st[kd],p=G.pins[kd]||{};const q=rt[kd];if(!r&&!q&&!p.f&&!p.l&&!p.rf&&!p.rl)continue;
+   const f=r?Math.min(...r):'',l=r?Math.max(...r):'',rf=q?Math.min(...q):'',rl=q?Math.max(...q):'',inp=(a,v,act)=>`<input type="number" min="1" max="${per}" data-p${a}="${esc(kd)}" value="${v}" class="${v!==''&&v!=act?'bad':''}">`;
+   rw+=`<tr><td>${esc(c.name)}</td><td>${esc(t)}</td><td>${d}日目</td><td>${r?r.length:0}</td><td>${inp('f',p.f||f,f)}</td><td>${inp('l',p.l||l,l)}</td><td>${q?q.length:0}</td><td>${inp('rf',p.rf||rf,rf)}</td><td>${inp('rl',p.rl||rl,rl)}</td></tr>`}}));
+  h+=`<h3>チーム別の出場順の指定</h3><div class="mu">各チームの、その日の最初と最後の試合、および審判を務める最初と最後が「第何試合目」かを書き出しています。数字を書き換えて「最適化」を押すと、その指定になるよう日程を組み直します(実現できない指定はエラーを表示します)。赤い欄は、まだ指定どおりになっていない欄です。</div><div class="row"><button id="opt">この指定で最適化</button><button class="s" id="pclr">指定をすべて解除</button></div><div id="omsg">${omsg}</div><div class="sc" id="pt"><table><tr><th>大会</th><th>チーム</th><th>日</th><th>試合数</th><th>初戦(第○試合)</th><th>最終戦(第○試合)</th><th>審判回数</th><th>審判の初回(第○試合)</th><th>審判の最終(第○試合)</th></tr>${rw}</table></div>`}
  $('#sched').innerHTML=h}
 function xl(){const M=allM(),per=Math.floor((tmin(G.end)-tmin(G.start))/G.dur),rows=[];let h='';const cn=c=>String.fromCharCode(65+c)+'コート',cs=Array.from({length:G.courts},(_,c)=>c);
  for(let d=0;d<G.days;d++){rows.push([d+1+'日目']);h+=`<tr><td colspan="${2+5*G.courts}" style="text-align:left;font-weight:700">${d+1}日目</td></tr>`;
@@ -205,7 +231,7 @@ function all(){rTop();upd()}
 document.addEventListener('change',e=>{const t=e.target,i=t.id,v=t.value,c=cur();
  if(t.dataset.inc){G.comps.find(x=>x.id==t.dataset.inc).inc=t.checked}
  else if(t.dataset.fd!=null||t.dataset.td!=null){const x=G.comps.find(z=>z.id==(t.dataset.fd||t.dataset.td));if(t.dataset.fd!=null)x.fd=v;else x.td=v}
- else if(t.dataset.pf!=null||t.dataset.pl!=null){const kd=t.dataset.pf??t.dataset.pl,f=t.dataset.pf!=null?'f':'l';G.pins=G.pins||{};G.pins[kd]=G.pins[kd]||{};if(v==='')delete G.pins[kd][f];else G.pins[kd][f]=Math.max(1,+v);if(!G.pins[kd].f&&!G.pins[kd].l)delete G.pins[kd]}
+ else if(['pf','pl','prf','prl'].some(a=>t.dataset[a]!=null)){const a=['pf','pl','prf','prl'].find(a=>t.dataset[a]!=null),kd=t.dataset[a],f=a.slice(1);G.pins=G.pins||{};G.pins[kd]=G.pins[kd]||{};if(v==='')delete G.pins[kd][f];else G.pins[kd][f]=Math.max(1,+v);if(!['f','l','rf','rl'].some(q=>G.pins[kd][q]))delete G.pins[kd]}
  else if(t.dataset.cf!=null||t.dataset.ct!=null){const x=G.comps.find(z=>z.id==(t.dataset.cf||t.dataset.ct));if(t.dataset.cf!=null)x.from=v;else x.to=v}
  else if(t.dataset.cc){G.comps.find(x=>x.id==t.dataset.cc).court=v}
  else if(i=='pat'){c.pat=v;c.win={}}
