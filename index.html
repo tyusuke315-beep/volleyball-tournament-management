@@ -67,6 +67,7 @@ table{border-collapse:collapse}th,td{border:1px solid var(--ln);padding:4px 8px;
 <div class="mu">大会名の右の「日」と「時間」は「この大会を行える日・時間帯」です(空欄なら制限なし。例: 1日目 ～ 1日目、10:00 ～ 13:00)。</div><div class="mu">試合カードを別の枠へドラッグで入れ替え、審判欄は直接書き換えできます。</div></div>
 <div id="msg"></div><div id="sched"></div></section>
 <section class="pn"><h2>データの書き出し・読み込み</h2><div class="mu">入力内容はこのブラウザに自動保存されます。別の端末へ移すときはここを使います。</div>
+<div class="mu">友達に見せるとき: 下の「共有URL」にGitHubのURL(https://ユーザー名.github.io/リポジトリ名/)を入れて「共有リンクを作る」を押し、できたリンクを送ってください。開いた人の画面に、今の内容がそのまま入ります。</div><div class="row"><label style="flex:1">共有URL <input id="base" placeholder="https://ユーザー名.github.io/リポジトリ名/" style="width:100%"></label><button id="lk">共有リンクを作る</button></div><div class="mu" id="lkm"></div>
 <div class="row"><button class="s" id="ex">書き出し</button><button class="s" id="im">読み込み</button></div><textarea id="io" style="height:70px"></textarea></section>
 </main>
 <script>
@@ -111,7 +112,7 @@ function rTop(){const c=cur();
  if(!c)return;
  $('#del').textContent='この大会を削除';delArm=false;
  $('#nm').value=c.name;$('#patL').style.display=c.mode=='tour'?'':'none';$('#pat').value=c.pat;$('#n').value=c.teams.length;$('#tx').value=c.teams.join('\n');
- ['days','start','end','dur','courts'].forEach(k=>$('#'+k).value=G[k])}
+ ['days','start','end','dur','courts'].forEach(k=>$('#'+k).value=G[k]);$('#base').value=G.base||''}
 function rPool(){const c=cur();if(!c)return;
  $('#pool').innerHTML=c.teams.map((t,i)=>`<span class="chip ${c.slots.includes(i)?'used':''} ${sel===i?'sel':''}" draggable="true" data-t="${i}">${esc(t)}</span>`).join('');
  $('#rt').innerHTML=G.comps.flatMap(x=>x.teams.map((t,i)=>`<option value="${x.id}|${i}">${esc(x.name)}:${esc(t)}</option>`)).join('');
@@ -245,6 +246,7 @@ document.addEventListener('change',e=>{const t=e.target,i=t.id,v=t.value,c=cur()
  else if(['pf','pl','prf','prl'].some(a=>t.dataset[a]!=null)){const a=['pf','pl','prf','prl'].find(a=>t.dataset[a]!=null),kd=t.dataset[a],f=a.slice(1);G.pins=G.pins||{};G.pins[kd]=G.pins[kd]||{};if(v==='')delete G.pins[kd][f];else G.pins[kd][f]=Math.max(1,+v);if(!['f','l','rf','rl'].some(q=>G.pins[kd][q]))delete G.pins[kd]}
  else if(t.dataset.cf!=null||t.dataset.ct!=null){const x=G.comps.find(z=>z.id==(t.dataset.cf||t.dataset.ct));if(t.dataset.cf!=null)x.from=v;else x.to=v}
  else if(t.dataset.cc){G.comps.find(x=>x.id==t.dataset.cc).court=v}
+ else if(i=='base'){G.base=v.trim()}
  else if(i=='pat'){c.pat=v;c.win={}}
  else if(i=='n'){const n=Math.max(2,Math.min(32,+v||2));while(c.teams.length<n)c.teams.push('チーム'+(c.teams.length+1));c.teams.length=n;fill(c);rTop()}
  else if(['days','courts','dur'].includes(i)){G[i]=Math.max(1,+v||1)}
@@ -272,7 +274,8 @@ document.addEventListener('click',e=>{const g=s=>e.target.closest(s),c=cur();
  else if(g('#pclr')){G.pins={};omsg='';upd()}
  else if(g('#ra')){const[a,b]=$('#rt').value.split('|');G.rules.push({c:+a,t:+b,p:$('#rp').value,d:$('#rd').value});upd()}
  else if(g('[data-rm]')){G.rules.splice(+g('[data-rm]').dataset.rm,1);upd()}
- else if(g('#ex')){$('#io').value=JSON.stringify(G)}
+ else if(g('#lk'))mkLink()
+ else if(g('#ex')){const j=JSON.stringify(G);$('#io').value=j;$('#io').select();try{navigator.clipboard.writeText(j);$('#lkm').textContent='書き出して、コピーしました。別の画面で「読み込み」の枠に貼り付けてください。'}catch(e){}}
  else if(g('#im')){try{const o=JSON.parse($('#io').value);Object.keys(G).forEach(k=>delete G[k]);Object.assign(G,o);all()}catch(x){$('#msg').textContent='読み込めませんでした。書き出したデータを貼り付けてください。'}}
  else if(g('#cp'))cp()
  else if(g('[data-win]')&&!(sel!=null&&g('[data-slot]'))){const[k,sd]=g('[data-win]').dataset.win.split('|');c.win[k]=c.win[k]==sd?undefined:sd;upd()}
@@ -292,4 +295,9 @@ document.addEventListener('drop',e=>{const el=tgt(e),d=e.dataTransfer.getData('t
 try{const o=JSON.parse(localStorage.getItem('vb1'));if(o&&o.comps&&o.comps.length)Object.assign(G,o)}catch(e){}
 if(!G.comps.length)newComp('league');
 all();
+async function enc(){const j=JSON.stringify(G),f=s=>btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');try{const cs=new CompressionStream('gzip'),w=cs.writable.getWriter();w.write(new TextEncoder().encode(j));w.close();const u=new Uint8Array(await new Response(cs.readable).arrayBuffer());let s='';u.forEach(x=>s+=String.fromCharCode(x));return'z='+f(s)}catch(e){return'd='+f(unescape(encodeURIComponent(j)))}}
+async function mkLink(){const bs=($('#base').value||'').trim(),u=(bs||location.href).split('#')[0]+'#'+await enc();$('#io').value=u;$('#io').select();let m='共有リンクを作りました。';try{await navigator.clipboard.writeText(u);m+='コピーしました。'}catch(e){m+='上の枠の文字をコピーしてください。'}if(!bs)m+='(共有URL欄が空なので、今開いているページのURLで作りました。GitHubのURLを入れてもう一度押してください)';$('#lkm').textContent=m}
+(async()=>{const h=location.hash;if(!/^#[zd]=/.test(h))return;try{const t=h.slice(3).replace(/-/g,'+').replace(/_/g,'/'),bin=atob(t);let j;
+ if(h[1]=='z'){const ds=new DecompressionStream('gzip'),w=ds.writable.getWriter();w.write(Uint8Array.from(bin,c=>c.charCodeAt(0)));w.close();j=new TextDecoder().decode(await new Response(ds.readable).arrayBuffer())}else j=decodeURIComponent(escape(bin));
+ const o=JSON.parse(j);Object.keys(G).forEach(k=>delete G[k]);Object.assign(G,o);history.replaceState(null,'',location.pathname+location.search);all();$('#msg').textContent='共有リンクの内容を読み込みました。'}catch(e){$('#msg').textContent='共有リンクを読み込めませんでした。リンクが途中で切れていないか確認してください。'}})();
 </script></body></html>
