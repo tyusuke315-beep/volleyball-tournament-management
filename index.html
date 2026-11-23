@@ -45,6 +45,8 @@ textarea{width:100%;height:190px;resize:vertical}
 .tr.w{background:var(--hi);color:#000;font-weight:700}
 .tr.slot{background:var(--hl)}.tr.over,td.over{outline:3px solid var(--hi)}
 .pt2{float:right;font-weight:700;margin-left:8px}
+.gt{display:inline-block;font-size:11px;background:var(--ac);color:#fff;border-radius:8px;padding:0 6px;margin-left:4px}.gp{width:4.5em;padding:0 4px;font-size:12px;margin-left:4px}
+details summary{cursor:pointer;color:var(--ac)}
 .champ{font-size:18px;font-weight:700;margin:6px 0;color:var(--ac)}
 .mu{color:var(--mu)}
 table{border-collapse:collapse}th,td{border:1px solid var(--ln);padding:4px 8px;text-align:center;vertical-align:top}
@@ -89,6 +91,7 @@ table{border-collapse:collapse}th,td{border:1px solid var(--ln);padding:4px 8px;
 <button class="s" id="fill">自動配置</button><button class="s" id="mvl">◀ 前へ</button><button class="s" id="mvr">後ろへ ▶</button><button class="s" id="del">この大会を削除</button></div>
 <div class="row" id="lkrow"></div>
 <div class="row" id="rdrow"></div>
+<div class="row" id="agrow"></div>
 <div class="two"><div><textarea id="tx" aria-label="チーム名(1行に1チーム)"></textarea></div>
 <div><div class="mu">チーム名(左で編集)。枠へドラッグ(スマホは札→枠の順にタップ)</div><div id="pool"></div></div></div></section>
 <section class="pn" data-in="prep"><h2>2. 組み合わせ・順位</h2><div id="board"></div><div class="mu" id="hint"></div><div id="stand"></div></section>
@@ -112,7 +115,7 @@ table{border-collapse:collapse}th,td{border:1px solid var(--ln);padding:4px 8px;
 <section class="pn" data-in="view" id="vwp"><div class="row noprint" id="vtool"><button id="lkr2">閲覧用リンクを作ってコピー</button><button class="s" onclick="print()">印刷</button><span class="mu" id="lkm2"></span></div><div id="vw"></div></section>
 <section class="pn" data-in="prep"><h2>データの書き出し・読み込み・共有</h2><div class="mu">入力内容はこのブラウザに自動保存されます。別の端末へ移すときはここを使います。</div>
 <div class="mu">共有URLにGitHubのURL(https://ユーザー名.github.io/リポジトリ名/)を入れてからリンクを作ってください。「編集用リンク」は運営スタッフ用(開いた人の画面に今の内容がそのまま入ります)、「閲覧用リンク」は参加者用(速報画面だけが見られ、開いた人のデータは上書きしません)。どちらもリンクを作った時点の内容です。</div><div class="row"><label style="flex:1">共有URL <input id="base" placeholder="https://ユーザー名.github.io/リポジトリ名/" style="width:100%"></label><button id="lk">編集用リンク</button><button id="lkr">閲覧用リンク</button></div><div class="mu" id="lkm"></div>
-<div class="row"><button class="s" id="ex">書き出し</button><button class="s" id="im">読み込み</button></div><textarea id="io" style="height:70px"></textarea></section>
+<div class="row"><button class="s" id="ex">書き出し</button><button class="s" id="im">読み込み</button><button class="s" id="pub">公開データ(data.json)を読み込む</button></div><div class="mu">「公開データ」は、GitHubに置いた data.json(大会の公式データ)です。初めて開いた人には自動で表示されます。</div><textarea id="io" style="height:70px"></textarea></section>
 </main>
 <script>
 const $=s=>document.querySelector(s),esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -122,11 +125,24 @@ const pow2=n=>{let p=2;while(p<n)p*=2;return p},size=c=>c.mode=='tour'?pow2(c.te
 const tmin=s=>{const[a,b]=s.split(':');return+a*60+ +b},hm=m=>String(m/60|0).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
 const perOf=()=>Math.max(1,Math.floor((tmin(G.end)-tmin(G.start))/G.dur));
 function fill(c){const N=size(c),n=c.teams.length;let a=[0];while(a.length<N)a=a.flatMap(x=>[x,2*a.length-1-x]);
- c.slots=c.mode=='tour'?a.map(x=>x<n?x:null):c.teams.map((_,i)=>i);c.win={};c.tres={};if(c.mode=='tour'&&c.src)fixSame(c)}
-// 同じリーグのチームどうしが1回戦で当たらないように入れ替える
-function fixSame(c){const s=c.slots,lg=x=>x==null||!c.src[x]?null:c.src[x].l,bad=i=>{const a=s[2*i],b=s[2*i+1];return a!=null&&b!=null&&lg(a)==lg(b)},P=s.length/2;
- const ord=[...Array(P).keys()].sort((i,j)=>(s[2*i+1]==null)-(s[2*j+1]==null));
- for(let i=0;i<P;i++)if(bad(i))for(const j of ord){if(j==i)continue;const x=2*i+1,y=2*j+1;[s[x],s[y]]=[s[y],s[x]];if(!bad(i)&&!bad(j))break;[s[x],s[y]]=[s[y],s[x]]}}
+ c.slots=c.mode=='tour'?a.map(x=>x<n?x:null):c.teams.map((_,i)=>i);c.win={};c.tres={};c.grp=[];if(c.mode=='tour'&&c.src)arrange(c)}
+// 大学名 = チーム名の最後の A/B/C などを除いた部分(例: 京大A → 京大)
+const uni=n=>{const x=String(n??'').replace(/[（(][^()（）]*[)）]$/,'').trim();return x.replace(/[\s　]*[A-Za-zＡ-Ｚａ-ｚ]$/,'')||x};
+// ベスト4までに当たりうる組(同じ4分の1ブロック)と、決勝まで当たらない方がよい組(同じ半分)のうち、同じ大学・同じリーグのもの
+function confPairs(c,s){s=s||c.slots;const N=s.length,Q=Math.max(1,N/4),H=Math.max(1,N/2),o=[];
+ for(let i=0;i<N;i++)for(let j=i+1;j<N;j++){const a=s[i],b=s[j];if(a==null||b==null||Math.floor(i/H)!=Math.floor(j/H))continue;
+  const u=uni(c.teams[a])==uni(c.teams[b]),l=!!(c.src&&c.src[a]&&c.src[b]&&c.src[a].l==c.src[b].l);if(u||l)o.push({a,b,u,l,q:N>=8&&Math.floor(i/Q)==Math.floor(j/Q)})}return o}
+// 同じ大学・同じリーグがベスト4までに当たらないように並べ替える。
+// 動かすのは同じ「シード枠」(印が同じ枠、印がなければ同じリーグ順位)どうしだけ。「固定」の枠と(空き)の位置は動かさない。
+function arrange(c){const s=c.slots,N=s.length,gk=i=>{const g=(c.grp||[])[i];if(g==='固定')return null;if(g)return'g'+g;const t=s[i];return c.src&&c.src[t]?'r'+c.src[t].k:''};
+ const mv=[];for(let i=0;i<N;i++)if(s[i]!=null&&gk(i)!=null)mv.push(i);const key={};mv.forEach(i=>key[i]=gk(i));
+ const cost=()=>confPairs(c,s).reduce((x,p)=>x+(p.q?100:3)*((p.u?1:0)+(p.l?1:0)),0);
+ const start=s.slice();let best=s.slice(),bc=cost();
+ for(let rs=0;rs<40&&bc>0;rs++){if(rs){const gs={};mv.forEach(i=>(gs[key[i]]=gs[key[i]]||[]).push(i));Object.values(gs).forEach(ix=>{const v=ix.map(i=>start[i]).sort(()=>Math.random()-.5);ix.forEach((i,k)=>s[i]=v[k])})}
+  let cc=cost();const NI=2500;
+  for(let it=0;it<NI;it++){const i=mv[Math.random()*mv.length|0],j=mv[Math.random()*mv.length|0];if(i==j||key[i]!==key[j])continue;
+   [s[i],s[j]]=[s[j],s[i]];const n=cost(),T=4*(1-it/NI)+.02;if(n<=cc||Math.random()<Math.exp((cc-n)/T)){cc=n;if(cc<bc){bc=cc;best=s.slice()}}else[s[i],s[j]]=[s[j],s[i]]}}
+ best.forEach((v,i)=>s[i]=v);c.win={};c.tres={};return confPairs(c).filter(p=>p.q).length}
 function fit(c){c.slots=Array.from({length:size(c)},(_,i)=>c.slots[i]!=null&&c.slots[i]<c.teams.length?c.slots[i]:null)}
 function newComp(mode){const id=G.uid++,k=G.comps.filter(c=>c.mode==mode).length+1;
  const c={id,mode,name:(mode=='tour'?'トーナメント':'リーグ')+k,pat:'single',teams:Array.from({length:mode=='tour'?8:4},(_,i)=>'チーム'+(i+1)),slots:[],win:{},res:{},tres:{},inc:true,court:''};
@@ -159,6 +175,7 @@ function setRaw(m,sd,f,v){const c=m.c,val=v===''||v==null?null:Math.max(0,Math.r
  else{const ti=m.a.t,tj=m.b.t;if(ti==null||tj==null)return;c.res=c.res||{};const k=Math.min(ti,tj)+'-'+Math.max(ti,tj);
   r=c.res[k]||(c.res[k]={s:[null,null],p:[null,null]});r.p=r.p||[null,null];r[f][ti<tj?sd:1-sd]=val;
   if([...r.s,...r.p].every(x=>x==null))delete c.res[k]}}
+const fixedOk=(c,ids)=>{const f=c.fixed;if(!f)return false;const v=f.slice(0,ids.length);return v.length==ids.length&&v.every(x=>x!=null&&ids.includes(x))&&new Set(v).size==ids.length};
 function standings(c){const ids=c.slots.filter(x=>x!=null&&x<c.teams.length),T={};
  ids.forEach(i=>T[i]={i,n:c.teams[i],g:0,w:0,l:0,sw:0,sl:0,pw:0,pl:0});
  const total=ids.length*(ids.length-1)/2;let dn=0;
@@ -169,12 +186,15 @@ function standings(c){const ids=c.slots.filter(x=>x!=null&&x<c.teams.length),T={
  const d=(x,y)=>x===y?0:x>y?-1:1,base=(a,b)=>d(a.w,b.w)||d(b.l,a.l)||d(a.sr,b.sr)||d(a.pr,b.pr),
   h2h=(a,b)=>{const r=getRes(c,a.i,b.i);return r?(r[0]>r[1]?-1:1):0},tb=c.tb||{};
  L.sort((a,b)=>base(a,b)||h2h(a,b)||(tb[b.i]||0)-(tb[a.i]||0)||a.i-b.i);
+ if(fixedOk(c,ids)){const f=c.fixed;L.sort((a,b)=>f.indexOf(a.i)-f.indexOf(b.i));L.forEach((o,k)=>{o.rank=k+1;o.tie=false});return{L,done:true,manual:true,left:Math.max(0,total-dn),ids}}
  L.forEach((o,k)=>{o.rank=k+1;o.tie=k>0&&!base(L[k-1],o)&&!h2h(L[k-1],o)});
- return{L,done:total>0&&dn>=total,left:Math.max(0,total-dn)}}
+ return{L,done:total>0&&dn>=total,left:Math.max(0,total-dn),ids}}
 function standHTML(c,ro){const S=standings(c),pt=S.L.some(o=>o.pw||o.pl),f=x=>x===Infinity?'MAX':x.toFixed(3);
- return`<div class="mu">${S.done?'✅ 全試合終了・順位確定':`残り${S.left}試合(暫定順位)`}</div><div class="sc st"><table><tr><th>順位</th><th>チーム</th><th>試合</th><th>勝</th><th>敗</th><th>セット</th><th>セット率</th>${pt?'<th>得点</th><th>得点率</th>':''}</tr>`+
+ const fx=c.fixed||[],man=ro?'':`<details ${c.fixed&&c.fixed.some(x=>x!=null)?'open':''}><summary>試合結果を入れずに、最終順位だけ決める</summary><div class="row">${S.ids.map((_,k)=>`<label>${k+1}位 <select data-fx="${c.id}|${k}"><option value="">—</option>${S.ids.map(i=>`<option value="${i}" ${fx[k]===i?'selected':''}>${esc(c.teams[i])}</option>`).join('')}</select></label>`).join('')}<button class="s" data-fxclr="${c.id}">解除</button></div><div class="mu">全部の順位を選ぶと、試合結果より優先して順位が確定します(トーナメントにもすぐ反映)。</div></details>`;
+ if(S.manual&&!S.L.some(o=>o.g))return'<div class="mu">✅ 最終順位</div><div class="sc st"><table><tr><th>順位</th><th>チーム</th></tr>'+S.L.map(o=>`<tr><td>${o.rank}</td><td style="text-align:left">${esc(o.n)}</td></tr>`).join('')+'</table></div>'+man;
+ return`<div class="mu">${S.manual?'✅ 最終順位(手入力で確定)':S.done?'✅ 全試合終了・順位確定':`残り${S.left}試合(暫定順位)`}</div><div class="sc st"><table><tr><th>順位</th><th>チーム</th><th>試合</th><th>勝</th><th>敗</th><th>セット</th><th>セット率</th>${pt?'<th>得点</th><th>得点率</th>':''}</tr>`+
   S.L.map((o,k)=>`<tr><td>${o.rank}${o.tie?' <span class="mu">同率</span>'+(ro?'':` <button class="s mini" data-tb="${c.id}|${o.i}|${S.L[k-1].i}" title="上のチームと入れ替え">▲</button>`):''}</td><td style="text-align:left">${esc(o.n)}</td><td>${o.g}</td><td>${o.w}</td><td>${o.l}</td><td>${o.sw}-${o.sl}</td><td>${o.g?f(o.sr):'-'}</td>${pt?`<td>${o.pw}-${o.pl}</td><td>${o.g?f(o.pr):'-'}</td>`:''}</tr>`).join('')+
-  '</table></div><div class="mu">順位は 勝数 → セット率 → 得点率 → 直接対決 の順で決めています。'+(S.L.some(o=>o.tie)&&!ro?'「同率」は抽選などで決めたら ▲ で上と入れ替えてください。':'')+'</div>'}
+  '</table></div><div class="mu">順位は 勝数 → セット率 → 得点率 → 直接対決 の順で決めています。'+(S.L.some(o=>o.tie)&&!ro?'「同率」は抽選などで決めたら ▲ で上と入れ替えてください。':'')+'</div>'+man}
 // リーグ順位 → トーナメントのチーム名
 function resolveAll(){const S={},st=L=>S[L.id]||(S[L.id]=standings(L));
  G.comps.forEach(c=>{if(c.mode!='tour'||!c.src)return;const old=c.teams.slice();c.pend=[];
@@ -189,10 +209,12 @@ function boardHTML(c,ro){const{R,M}=build(c);let h='',hint='';
  if(c.mode=='tour'){h='<div class="br">'+R.map((rd,ri)=>`<div class="rd"><h4>${ri==R.length-1?(rd.length>1?'決勝・3位決定':'決勝'):ri==R.length-2?'準決勝':(ri+1)+'回戦'}</h4>`+rd.map(m=>{
   const row=sd=>{const T=tm(c,m[sd]),k=m.r+'-'+m.i,si=2*m.i+(sd=='b'?1:0),r=(c.tres||{})[k],sv=r?r.s[sd=='a'?0:1]:null,dr=!ro&&m.r==0;
    const inner=dr&&T.k!=null?`<span class="chip" draggable="true" data-from="${si}">${esc(T.n)}</span>`:`<span class="${T.k==null?'mu':''}">${esc(T.n)}</span>`;
-   return`<div class="tr ${c.win[k]==sd?'w':''} ${dr?'slot':''}" ${dr?`data-slot="${si}"`:''} ${m.bye||ro?'':`data-win="${k}|${sd}"`}>${inner}${sv!=null&&!m.bye?`<span class="pt2">${esc(sv)}</span>`:''}</div>`};
+   const gl=dr?((c.grp||[])[si]||''):'',gx=!dr?'':c.showGrp?`<input class="gp" data-grp="${si}" value="${esc(gl)}" placeholder="自由" aria-label="シード枠の印">`:gl?`<span class="gt">${esc(gl)}</span>`:'';
+   return`<div class="tr ${c.win[k]==sd?'w':''} ${dr?'slot':''}" ${dr?`data-slot="${si}"`:''} ${m.bye||ro?'':`data-win="${k}|${sd}"`}>${inner}${gx}${sv!=null&&!m.bye?`<span class="pt2">${esc(sv)}</span>`:''}</div>`};
   return`<div class="mb"><small>${m.bye?'':'第'+m.no+'試合'}${m.third?' 3位決定':''}</small>${row('a')}${row('b')}</div>`}).join('')+'</div>').join('')+'</div>';
   const fin=R[R.length-1].find(m=>!m.third),fw=fin&&c.win[fin.r+'-'+fin.i];if(fw){const T=tm(c,fin[fw]);if(T.k)h='<div class="champ">🏆 優勝 '+esc(T.n)+'</div>'+h}
-  hint='1回戦の枠にドラッグで配置。「(空き)」は不戦勝。勝ったチームをタップするか、「③ 結果入力」でセット数を入れると次の試合に進みます。'}
+  hint='1回戦の枠にドラッグで配置。「(空き)」は不戦勝。勝ったチームをタップするか、「③ 結果入力」でセット数を入れると次の試合に進みます。';
+  if(c.slots.length>=8){const P=confPairs(c).filter(p=>p.q);hint+=P.length?' ⚠ ベスト4までに当たる可能性がある組: '+P.map(p=>c.teams[p.a]+'–'+c.teams[p.b]+'('+[p.u&&'同じ大学',p.l&&'同じリーグ'].filter(Boolean).join('・')+')').join('、'):' ✅ ベスト4までに、同じ大学・同じリーグのチームは当たりません。'}}
  else{const no={};M.forEach(m=>no[m.pa+'-'+m.pb]=no[m.pb+'-'+m.pa]=m.no);
   const cell=(i,j)=>{if(i==j)return'—';const r=getRes(c,c.slots[i],c.slots[j]);return r?`<b>${r[0]>r[1]?'○':'●'}</b> ${r[0]}-${r[1]}`:ro?'':(no[i+'-'+j]||'')};
   h='<div class="sc mx"><table><tr><th></th>'+c.slots.map((t,i)=>`<th>${ro&&t!=null?esc(c.teams[t]):i+1}</th>`).join('')+'</tr>'+c.slots.map((t,i)=>`<tr><th ${ro?'':`class="slot" data-slot="${i}"`} style="text-align:left">${ro?'':i+1+' '}${t==null?'<span class="mu">未配置</span>':ro?esc(c.teams[t]):`<span class="chip" draggable="true" data-from="${i}">${esc(c.teams[t])}</span>`}</th>`+c.slots.map((_,j)=>`<td>${cell(i,j)}</td>`).join('')+'</tr>').join('')+'</table></div>';
@@ -206,10 +228,12 @@ function rTop(){const c=cur();
  $('#nm').value=c.name;$('#patL').style.display=c.mode=='tour'?'':'none';$('#pat').value=c.pat;$('#n').value=c.teams.length;$('#tx').value=c.teams.join('\n');
  ['days','start','end','dur','courts'].forEach(k=>$('#'+k).value=G[k]);$('#base').value=G.base||''}
 const dayOpts=(v,first)=>`<option value="">${first}</option>`+Array.from({length:G.days},(_,k)=>`<option value="${k+1}" ${String(v)===String(k+1)?'selected':''}>${k+1}日目</option>`).join('');
-function rTour(){const c=cur(),el=$('#lkrow'),rd=$('#rdrow');
- if(!c||c.mode!='tour'){el.hidden=rd.hidden=true;$('#tx').readOnly=false;$('#n').disabled=false;return}
- el.hidden=rd.hidden=false;const Ls=G.comps.filter(x=>x.mode=='league'),lk=c.link||{ls:Ls.map(x=>x.id),k:2};
- el.innerHTML=Ls.length?`<b>出場チーム:</b> リーグ戦の順位から決める → ${Ls.map(x=>`<label><input type="checkbox" data-lkl="${x.id}" ${lk.ls.includes(x.id)?'checked':''}>${esc(x.name)}</label>`).join(' ')} の上位 <input type="number" id="lkk" min="1" max="16" value="${lk.k}"> チームずつ <button id="lkimp">${c.src?'取り込み直す':'取り込む'}</button>${c.src?' <button class="s" id="lkoff">連携を解除</button>':''}<div class="mu" style="flex-basis:100%">${c.src?'🔗 リーグ戦と連携中です。そのリーグの全試合の結果が入ると、「リーグ1 1位」などが実際のチーム名に変わります(日程・審判欄も自動で置きかわります)。':'各リーグの1位どうしが早く当たらないように配置します(枠はあとからドラッグで変更できます)。'}</div>`:'<span class="mu">リーグ戦を作ると、その順位からトーナメントの出場チームを決められます。</span>';
+const linkOf=c=>{const Ls=G.comps.filter(x=>x.mode=='league'),lk=c.link||{ls:Ls.map(x=>x.id)};return{ls:lk.ls,from:lk.from||1,to:lk.from?lk.to:(lk.k||2)}};
+function rTour(){const c=cur(),el=$('#lkrow'),rd=$('#rdrow'),ag=$('#agrow');
+ if(!c||c.mode!='tour'){el.hidden=rd.hidden=ag.hidden=true;$('#tx').readOnly=false;$('#n').disabled=false;return}
+ el.hidden=rd.hidden=ag.hidden=false;const Ls=G.comps.filter(x=>x.mode=='league'),lk=linkOf(c);
+ ag.innerHTML=`<b>組み合わせ:</b> <button id="arr">同じ大学・同じリーグをベスト4まで避けて並べ替え</button> <label><input type="checkbox" id="sgrp" ${c.showGrp?'checked':''}> シード枠の印を編集</label><span class="mu" id="armsg"></span><div class="mu" style="flex-basis:100%">大学名はチーム名の最後のA・B・Cを除いた部分で判断します(京大A と 京大B は同じ大学)。並べ替えでは、同じ印の枠どうし(印がない枠は同じリーグ順位どうし)だけを入れ替えます。「固定」と書いた枠と「(空き)」の位置、つまりトーナメントの形は変わりません。</div>`;
+ el.innerHTML=Ls.length?`<b>出場チーム:</b> リーグ戦の順位から決める → ${Ls.map(x=>`<label><input type="checkbox" data-lkl="${x.id}" ${lk.ls.includes(x.id)?'checked':''}>${esc(x.name)}</label>`).join(' ')} の <input type="number" id="lkf" min="1" max="16" value="${lk.from}">位 ～ <input type="number" id="lkt" min="1" max="16" value="${lk.to||''}" placeholder="最下位">位 を <button id="lkimp">${c.src?'取り込み直す':'取り込む'}</button>${c.src?' <button class="s" id="lkoff">連携を解除</button>':''}<div class="mu" style="flex-basis:100%">${c.src?'🔗 リーグ戦と連携中です。そのリーグの全試合の結果が入ると、「リーグ1 1位」などが実際のチーム名に変わります(日程・審判欄も自動で置きかわります)。':'例: 上位トーナメントは「1位～2位」、下位トーナメントは「3位～(空欄=最下位)」。同じ大学・同じリーグがベスト4まで当たらないように配置します(枠はあとからドラッグで変更できます)。'}</div>`:'<span class="mu">リーグ戦を作ると、その順位からトーナメントの出場チームを決められます。</span>';
  const{R}=build(c),rdy=c.rday||{};
  rd.innerHTML=`<b>試合日:</b> <span>この大会は <select data-fd="${c.id}">${dayOpts(c.fd,'最初の日')}</select> ～ <select data-td="${c.id}">${dayOpts(c.td,'最後の日')}</select></span>`+R.map((_,ri)=>`<label>${rname(R,ri)} <select data-rday="${ri}">${dayOpts(rdy[ri],'自動')}</select></label>`).join(' ')+`<span class="mu" style="flex-basis:100%">例: 4日間の大会なら「3日目 ～ 4日目」。準決勝・決勝だけ4日目にしたいときは各回戦の日を選びます。日数は「② 日程」で設定します(今は${G.days}日)。</span>`;
  $('#tx').readOnly=!!c.src;$('#n').disabled=!!c.src;if(c.src)$('#tx').value=c.teams.join('\n')}
@@ -372,7 +396,7 @@ function rRes(){const s=$('#rv'),v0=G.rv||'cur',c0=cur();
  $('#rside').innerHTML=cs.map(c=>`<h3>${c.mode=='tour'?'🏆':'📋'} ${esc(c.name)}</h3>`+(c.mode=='league'?standHTML(c,false):boardHTML(c,true).h)).join('')}
 function rView(){const per=perOf(),M=allM(true);let h='<h2>速報(結果・順位)</h2>';
  h+=RO?`<div class="mu">閲覧専用のページです${G.ts?'('+esc(G.ts)+' 時点)':''}。最新の結果は、運営から新しいリンクをもらって開いてください。</div>`:'<div class="mu noprint">参加者に見せる画面です。「閲覧用リンク」を送ると、この画面だけを見られます(リンクを作った時点の内容です)。</div>';
- G.comps.forEach(c=>{h+=`<h3>${c.mode=='tour'?'🏆':'📋'} ${esc(c.name)}</h3>`+(c.mode=='league'?standHTML(c,true):'')+boardHTML(c,true).h});
+ G.comps.forEach(c=>{const S=c.mode=='league'&&standings(c),bare=S&&S.manual&&!S.L.some(o=>o.g);h+=`<h3>${c.mode=='tour'?'🏆':'📋'} ${esc(c.name)}</h3>`+(c.mode=='league'?standHTML(c,true):'')+(bare?'':boardHTML(c,true).h)});
  if(Object.keys(G.cells).length)for(let d=0;d<G.days;d++){let rows='';
   for(let k=0;k<per;k++){const t=d*per+k,ms=Array.from({length:G.courts},(_,c)=>M.find(x=>x.g==G.cells[t+'-'+c]));if(!ms.some(Boolean))continue;
    rows+=`<tr><th>${hm(tmin(G.start)+k*G.dur)}～</th>`+ms.map(m=>`<td>${m?`<small class="mu">${esc(m.c.name)} 第${m.no}試合 ${m.c.mode=='tour'?lab(m.c,m,m.R):''}</small><br>${vsHTML(m,'span')}`:''}</td>`).join('')+'</tr>'}
@@ -391,7 +415,10 @@ document.addEventListener('change',e=>{const t=e.target,i=t.id,v=t.value,c=cur()
  if(t.dataset.inc){G.comps.find(x=>x.id==t.dataset.inc).inc=t.checked}
  else if(t.dataset.lk){G.comps.find(x=>x.id==t.dataset.lk).lock=t.checked}
  else if(t.dataset.rday!=null){c.rday=c.rday||{};if(v)c.rday[t.dataset.rday]=v;else delete c.rday[t.dataset.rday]}
- else if(t.dataset.lkl!=null||i=='lkk'){c.link={ls:[...document.querySelectorAll('[data-lkl]')].filter(x=>x.checked).map(x=>+x.dataset.lkl),k:Math.max(1,+$('#lkk').value||1)}}
+ else if(t.dataset.lkl!=null||i=='lkf'||i=='lkt'){c.link={ls:[...document.querySelectorAll('[data-lkl]')].filter(x=>x.checked).map(x=>+x.dataset.lkl),from:Math.max(1,+$('#lkf').value||1),to:$('#lkt').value?Math.max(1,+$('#lkt').value):''}}
+ else if(t.dataset.fx){const[cid,k]=t.dataset.fx.split('|'),x=G.comps.find(z=>z.id==cid);x.fixed=x.fixed||[];const val=v===''?null:+v,old=x.fixed[+k]??null,j=val==null?-1:x.fixed.indexOf(val);if(j>=0)x.fixed[j]=old;x.fixed[+k]=val}
+ else if(t.dataset.grp!=null){c.grp=c.grp||[];c.grp[+t.dataset.grp]=v.trim()}
+ else if(i=='sgrp'){c.showGrp=t.checked}
  else if(i=='rv'){G.rv=v}else if(i=='ronly'){G.ronly=t.checked}
  else if(t.dataset.fd!=null||t.dataset.td!=null){const x=G.comps.find(z=>z.id==(t.dataset.fd||t.dataset.td));if(t.dataset.fd!=null)x.fd=v;else x.td=v}
  else if(['pf','pl','prf','prl'].some(a=>t.dataset[a]!=null)){const a=['pf','pl','prf','prl'].find(a=>t.dataset[a]!=null),kd=t.dataset[a],f=a.slice(1);G.pins=G.pins||{};G.pins[kd]=G.pins[kd]||{};if(v==='')delete G.pins[kd][f];else G.pins[kd][f]=Math.max(1,+v);if(!['f','l','rf','rl'].some(q=>G.pins[kd][q]))delete G.pins[kd]}
@@ -408,16 +435,19 @@ document.addEventListener('input',e=>{const t=e.target,c=cur();
  else if(t.id=='tx'){if(c.src)return;const a=t.value.split('\n').map(s=>s.trim()).filter(Boolean);if(a.length<2)return;c.teams=a;$('#n').value=a.length;fit(c);upd()}
  else if(t.dataset.ref){G.refs[t.dataset.ref]=t.value;save()}});
 function place(c,t,to,swap){const old=c.slots[to],fi=c.slots.indexOf(t);if(fi>=0)c.slots[fi]=swap?old:null;c.slots[to]=t}
-function importLeague(c){const lk=c.link||{ls:G.comps.filter(x=>x.mode=='league').map(x=>x.id),k:2},ls=G.comps.filter(x=>x.mode=='league'&&lk.ls.includes(x.id)),src=[];
- for(let k=1;k<=lk.k;k++)ls.forEach(L=>{if(k<=L.teams.length)src.push({l:L.id,k})});
+function importLeague(c){const lk=linkOf(c),ls=G.comps.filter(x=>x.mode=='league'&&lk.ls.includes(x.id)),src=[],mx=Math.max(0,...ls.map(L=>L.teams.length));
+ for(let k=lk.from;k<=(lk.to||mx);k++)ls.forEach(L=>{if(k<=L.teams.length)src.push({l:L.id,k})});
  if(src.length<2){$('#hint').textContent='取り込むリーグを選んでください(2チーム以上必要です)。';return}
  c.link=lk;c.src=src;c.teams=src.map(()=>null);resolveAll();fill(c);all()}
-document.addEventListener('click',e=>{const g=s=>e.target.closest(s),c=cur();
+document.addEventListener('click',e=>{const g=s=>e.target.closest(s),c=cur();if(e.target.closest('input,select,textarea'))return;
  if(g('#nav [data-v]')){G.view=g('[data-v]').dataset.v;applyView();save();scrollTo(0,0)}
  else if(g('[data-act]')){G.act=+g('[data-act]').dataset.act;sel=null;all()}
  else if(g('[data-add]')){newComp(g('[data-add]').dataset.add);sel=null;all()}
  else if(g('#lkimp'))importLeague(c)
  else if(g('#lkoff')){delete c.src;delete c.pend;all()}
+ else if(g('#arr')){const n=arrange(c);upd();$('#armsg').textContent=n?' すべては避けられませんでした(下の⚠を確認してください)。':' ✅ 並べ替えました。'}
+ else if(g('[data-fxclr]')){const x=G.comps.find(z=>z.id==g('[data-fxclr]').dataset.fxclr);delete x.fixed;upd()}
+ else if(g('#pub')){const b=$('#pub');if(!pubArm){pubArm=true;b.textContent='もう一度押すと今のデータを上書き';setTimeout(()=>{pubArm=false;b.textContent='公開データ(data.json)を読み込む'},3500)}else{pubArm=false;loadPub(true)}}
  else if(g('[data-tb]')){const[cid,i,j]=g('[data-tb]').dataset.tb.split('|'),x=G.comps.find(z=>z.id==cid);x.tb=x.tb||{};x.tb[i]=(x.tb[j]||0)+1;upd()}
  else if(g('#del')){const b=$('#del');
   if(G.comps.length<2){b.textContent='最後の1つは削除できません';setTimeout(()=>b.textContent='この大会を削除',2500)}
@@ -452,7 +482,10 @@ document.addEventListener('drop',e=>{const el=tgt(e),d=e.dataTransfer.getData('t
  if(el.id=='pool'){if(d[0]=='s')c.slots[+d.slice(1)]=null}
  else if(el.dataset.slot!=null&&t!=null)place(c,t,+el.dataset.slot,d[0]=='s');
  upd()});
-try{const o=JSON.parse(localStorage.getItem('vb1'));if(o&&o.comps&&o.comps.length)Object.assign(G,o)}catch(e){}
+let hadLocal=false,pubArm=false;try{const o=JSON.parse(localStorage.getItem('vb1'));if(o&&o.comps&&o.comps.length){Object.assign(G,o);hadLocal=true}}catch(e){}
+async function loadPub(force){try{const r=await fetch('data.json',{cache:'no-store'});if(!r.ok)throw 0;const o=await r.json();if(!o||!o.comps||!o.comps.length)throw 0;
+ Object.keys(G).forEach(k=>delete G[k]);Object.assign(G,o);all();if(force)$('#lkm').textContent='公開データを読み込みました。'}catch(e){if(force)$('#lkm').textContent='公開データ(data.json)を読み込めませんでした。'}}
+if(!hadLocal&&location.protocol!='file:'&&!/^#r?[zd]=/.test(location.hash))loadPub(false);
 if(!G.comps.length)newComp('league');
 all();
 async function enc(){const j=JSON.stringify(G),f=s=>btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');try{const cs=new CompressionStream('gzip'),w=cs.writable.getWriter();w.write(new TextEncoder().encode(j));w.close();const u=new Uint8Array(await new Response(cs.readable).arrayBuffer());let s='';u.forEach(x=>s+=String.fromCharCode(x));return'z='+f(s)}catch(e){return'd='+f(unescape(encodeURIComponent(j)))}}
