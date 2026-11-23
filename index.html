@@ -45,6 +45,7 @@ textarea{width:100%;height:190px;resize:vertical}
 .tr.w{background:var(--hi);color:#000;font-weight:700}
 .tr.slot{background:var(--hl)}.tr.over,td.over{outline:3px solid var(--hi)}
 .pt2{float:right;font-weight:700;margin-left:8px}
+.xb{display:flex;flex-wrap:wrap;gap:10px;margin:6px 0}.xb .mb{min-width:200px}
 .gt{display:inline-block;font-size:11px;background:var(--ac);color:#fff;border-radius:8px;padding:0 6px;margin-left:4px}.gp{width:4.5em;padding:0 4px;font-size:12px;margin-left:4px}
 details summary{cursor:pointer;color:var(--ac)}
 .champ{font-size:18px;font-weight:700;margin:6px 0;color:var(--ac)}
@@ -92,6 +93,7 @@ table{border-collapse:collapse}th,td{border:1px solid var(--ln);padding:4px 8px;
 <div class="row" id="lkrow"></div>
 <div class="row" id="rdrow"></div>
 <div class="row" id="agrow"></div>
+<div class="row" id="exrow"></div>
 <div class="two"><div><textarea id="tx" aria-label="チーム名(1行に1チーム)"></textarea></div>
 <div><div class="mu">チーム名(左で編集)。枠へドラッグ(スマホは札→枠の順にタップ)</div><div id="pool"></div></div></div></section>
 <section class="pn" data-in="prep"><h2>2. 組み合わせ・順位</h2><div id="board"></div><div class="mu" id="hint"></div><div id="stand"></div></section>
@@ -143,6 +145,23 @@ function arrange(c){const s=c.slots,N=s.length,gk=i=>{const g=(c.grp||[])[i];if(
   for(let it=0;it<NI;it++){const i=mv[Math.random()*mv.length|0],j=mv[Math.random()*mv.length|0];if(i==j||key[i]!==key[j])continue;
    [s[i],s[j]]=[s[j],s[i]];const n=cost(),T=4*(1-it/NI)+.02;if(n<=cc||Math.random()<Math.exp((cc-n)/T)){cc=n;if(cc<bc){bc=cc;best=s.slice()}}else[s[i],s[j]]=[s[j],s[i]]}}
  best.forEach((v,i)=>s[i]=v);c.win={};c.tres={};return confPairs(c).filter(p=>p.q).length}
+// 2日間の予定: 1日目=ベスト4まで+敗者戦(負けたチームは1日目に最低2試合)、2日目=準決勝・決勝・3位決定戦+交流戦(ベスト4以外も最低1試合)
+function autoTwoDay(c,d1,d2){c.pat='third';c.ex=[];c.win={};c.tres={};const{R}=build(c),L=R.length,key=m=>m.r+'-'+m.i;c.rday={};
+ for(let r=0;r<L;r++)c.rday[r]=String(r<L-2?d1:d2);
+ const day1=R.slice(0,Math.max(0,L-2)).flat().filter(m=>!m.bye),gp=s=>s.m&&!s.m.bye?1+Math.min(gp(s.m.a),gp(s.m.b)):0,lmin=m=>1+Math.min(gp(m.a),gp(m.b));
+ const sub=m=>{const o=new Set([m]);[m.a,m.b].forEach(s=>{if(s.m)sub(s.m).forEach(x=>o.add(x))});return o},rel=(x,y)=>sub(x).has(y)||sub(y).has(x);
+ let n=0;const add=(a,b,day,name)=>c.ex.push({id:'x'+(++n),a:{m:key(a),w:0},b:{m:key(b),w:0},day:String(day),name});
+ // 1日目の敗者戦
+ const need=day1.filter(m=>lmin(m)<2),p1=[],left=need.slice();
+ while(left.length){const a=left.shift(),j=left.findIndex(b=>!rel(a,b));if(j>=0){p1.push([a,left.splice(j,1)[0]])}else{const o=day1.find(b=>b!=a&&!need.includes(b)&&!rel(a,b)&&!p1.some(p=>p.includes(b)));if(o)p1.push([a,o])}}
+ p1.forEach(([a,b])=>add(a,b,d1,'敗者戦'));
+ // 2日目の交流戦(前日の敗者戦や、それまでの試合と同じ相手にならない組み合わせ)
+ const met=(a,b)=>rel(a,b)||p1.some(p=>p.includes(a)&&p.includes(b)),E=day1.slice(),best=[];
+ const bt=(rest,acc)=>{if(!rest.length){best.splice(0,best.length,...acc);return true}const a=rest[0];
+  for(let j=1;j<rest.length;j++){const b=rest[j];if(met(a,b))continue;if(bt(rest.filter((_,k)=>k&&k!=j),[...acc,[a,b]]))return true}return false};
+ if(E.length%2==0)bt(E,[]);else{for(let k=0;k<E.length&&!best.length;k++){const o=E.find(b=>b!=E[k]&&!met(E[k],b));if(o&&bt(E.filter((_,q)=>q!=k),[])){best.push([E[k],o])}}}
+ best.forEach(([a,b])=>add(a,b,d2,'交流戦'));
+ c.fd=String(d1);c.td=String(d2);return{p1:p1.length,p2:best.length}}
 function fit(c){c.slots=Array.from({length:size(c)},(_,i)=>c.slots[i]!=null&&c.slots[i]<c.teams.length?c.slots[i]:null)}
 function newComp(mode){const id=G.uid++,k=G.comps.filter(c=>c.mode==mode).length+1;
  const c={id,mode,name:(mode=='tour'?'トーナメント':'リーグ')+k,pat:'single',teams:Array.from({length:mode=='tour'?8:4},(_,i)=>'チーム'+(i+1)),slots:[],win:{},res:{},tres:{},inc:true,court:''};
@@ -156,11 +175,14 @@ function build(c){const R=[];
  }else{let ps=c.teams.map((_,i)=>i);if(ps.length%2)ps.push(null);const n=ps.length;
   for(let r=0;r<n-1;r++){const q=[];for(let i=0;i<n/2;i++){const x=ps[i],y=ps[n-1-i];if(x!=null&&y!=null)q.push({r,i,pa:x,pb:y,a:{t:c.slots[x]},b:{t:c.slots[y]}})}
    R.push(q);ps=[ps[0],ps[n-1],...ps.slice(1,n-1)]}}
- const M=R.flat().filter(m=>!m.bye);M.forEach((m,k)=>m.no=k+1);return{R,M}}
+ const M=R.flat().filter(m=>!m.bye);
+ if(c.mode=='tour'&&c.ex&&c.ex.length){const bk={};R.flat().forEach(m=>bk[m.r+'-'+m.i]=m);
+  c.ex.forEach(x=>{const A=bk[x.a.m],B=bk[x.b.m];if(!A||!B)return;const m={r:Math.max(A.r,B.r)+1,i:x.id,x:1,lbl:x.name||'交流戦',day:x.day,a:{m:A,w:x.a.w},b:{m:B,w:x.b.w}};bk[x.id]=m;M.push(m)})}
+ M.forEach((m,k)=>m.no=k+1);return{R,M}}
 function tm(c,s){if(s.m){const m=s.m;if(m.bye){const t=m.a.t??m.b.t;return t==null?{n:'—'}:{n:c.teams[t],k:c.id+'|'+c.teams[t]}}
   const w=c.win[m.r+'-'+m.i];if(!w)return{n:`第${m.no}試合の${s.w?'勝者':'敗者'}`};return tm(c,m[s.w?w:w=='a'?'b':'a'])}
  return s.t==null?{n:c.mode=='tour'?'(空き)':'未配置'}:{n:c.teams[s.t],k:c.id+'|'+c.teams[s.t]}}
-const lab=(c,m,R)=>{if(c.mode!='tour')return'リーグ';const L=R.length;return m.third?'3位決定戦':m.r==L-1?'決勝':m.r==L-2?'準決勝':(m.r+1)+'回戦'};
+const lab=(c,m,R)=>{if(c.mode!='tour')return'リーグ';if(m.x)return m.lbl;const L=R.length;return m.third?'3位決定戦':m.r==L-1?'決勝':m.r==L-2?'準決勝':(m.r+1)+'回戦'};
 const rname=(R,ri)=>ri==R.length-1?'決勝':ri==R.length-2?'準決勝':(ri+1)+'回戦';
 
 /* ---------- 結果・順位 ---------- */
@@ -212,6 +234,9 @@ function boardHTML(c,ro){const{R,M}=build(c);let h='',hint='';
    const gl=dr?((c.grp||[])[si]||''):'',gx=!dr?'':c.showGrp?`<input class="gp" data-grp="${si}" value="${esc(gl)}" placeholder="自由" aria-label="シード枠の印">`:gl?`<span class="gt">${esc(gl)}</span>`:'';
    return`<div class="tr ${c.win[k]==sd?'w':''} ${dr?'slot':''}" ${dr?`data-slot="${si}"`:''} ${m.bye||ro?'':`data-win="${k}|${sd}"`}>${inner}${gx}${sv!=null&&!m.bye?`<span class="pt2">${esc(sv)}</span>`:''}</div>`};
   return`<div class="mb"><small>${m.bye?'':'第'+m.no+'試合'}${m.third?' 3位決定':''}</small>${row('a')}${row('b')}</div>`}).join('')+'</div>').join('')+'</div>';
+  const X=M.filter(m=>m.x);if(X.length){const byDay={};X.forEach(m=>(byDay[m.day||'']=byDay[m.day||'']||[]).push(m));
+   h+=Object.keys(byDay).sort().map(d=>`<h4>${d?d+'日目の':''}敗者戦・交流戦</h4><div class="xb">`+byDay[d].map(m=>{const k=m.r+'-'+m.i,r=(c.tres||{})[k],row=sd=>{const T=tm(c,m[sd]),sv=r?r.s[sd=='a'?0:1]:null;return`<div class="tr ${c.win[k]==sd?'w':''}" ${ro?'':`data-win="${k}|${sd}"`}><span class="${T.k==null?'mu':''}">${esc(T.n)}</span>${sv!=null?`<span class="pt2">${esc(sv)}</span>`:''}</div>`};
+    return`<div class="mb"><small>第${m.no}試合 ${esc(m.lbl)}${ro?'':` <button class="s mini" data-exdel="${m.i}" title="この試合を削除">×</button>`}</small>${row('a')}${row('b')}</div>`}).join('')+'</div>').join('')}
   const fin=R[R.length-1].find(m=>!m.third),fw=fin&&c.win[fin.r+'-'+fin.i];if(fw){const T=tm(c,fin[fw]);if(T.k)h='<div class="champ">🏆 優勝 '+esc(T.n)+'</div>'+h}
   hint='1回戦の枠にドラッグで配置。「(空き)」は不戦勝。勝ったチームをタップするか、「③ 結果入力」でセット数を入れると次の試合に進みます。';
   if(c.slots.length>=8){const P=confPairs(c).filter(p=>p.q);hint+=P.length?' ⚠ ベスト4までに当たる可能性がある組: '+P.map(p=>c.teams[p.a]+'–'+c.teams[p.b]+'('+[p.u&&'同じ大学',p.l&&'同じリーグ'].filter(Boolean).join('・')+')').join('、'):' ✅ ベスト4までに、同じ大学・同じリーグのチームは当たりません。'}}
@@ -229,9 +254,13 @@ function rTop(){const c=cur();
  ['days','start','end','dur','courts'].forEach(k=>$('#'+k).value=G[k]);$('#base').value=G.base||''}
 const dayOpts=(v,first)=>`<option value="">${first}</option>`+Array.from({length:G.days},(_,k)=>`<option value="${k+1}" ${String(v)===String(k+1)?'selected':''}>${k+1}日目</option>`).join('');
 const linkOf=c=>{const Ls=G.comps.filter(x=>x.mode=='league'),lk=c.link||{ls:Ls.map(x=>x.id)};return{ls:lk.ls,from:lk.from||1,to:lk.from?lk.to:(lk.k||2)}};
-function rTour(){const c=cur(),el=$('#lkrow'),rd=$('#rdrow'),ag=$('#agrow');
- if(!c||c.mode!='tour'){el.hidden=rd.hidden=ag.hidden=true;$('#tx').readOnly=false;$('#n').disabled=false;return}
- el.hidden=rd.hidden=ag.hidden=false;const Ls=G.comps.filter(x=>x.mode=='league'),lk=linkOf(c);
+function rTour(){const c=cur(),el=$('#lkrow'),rd=$('#rdrow'),ag=$('#agrow'),xr=$('#exrow');
+ if(!c||c.mode!='tour'){el.hidden=rd.hidden=ag.hidden=xr.hidden=true;$('#tx').readOnly=false;$('#n').disabled=false;return}
+ el.hidden=rd.hidden=ag.hidden=xr.hidden=false;
+ {const{M}=build(c),d1=+(c.fd||1),opt=M.map(m=>[1,0].map(w=>`<option value="${m.x?m.i:m.r+'-'+m.i}|${w}">第${m.no}試合(${esc(lab(c,m,build(c).R))})の${w?'勝者':'敗者'}</option>`).join('')).join('');
+  xr.innerHTML=`<b>敗者戦・交流戦:</b> 1日目 <select id="xd1">${dayOpts(d1,'—')}</select> 2日目 <select id="xd2">${dayOpts(c.fd&&c.td&&c.td!=c.fd?c.td:d1+1,'—')}</select> <button id="x2d">2日間の予定を自動で組む</button><span class="mu" id="xmsg"></span>
+  <div class="mu" style="flex-basis:100%">1日目: ベスト4が決まるまで。負けたチームは負け同士の「敗者戦」で、1日目に最低2試合。ベスト4に残ったチームはそこまでの試合だけ。2日目: 準決勝 → 決勝・3位決定戦(ベスト4は勝っても負けても2試合)。ベスト4以外は「交流戦」で最低1試合(それまでに当たった相手とは組みません)。押したあと「② 日程」で「日程を作成」してください。</div>
+  <span>手動で追加:</span> <select id="xa">${opt}</select> vs <select id="xb">${opt}</select> <select id="xdy">${dayOpts(c.fd||'','日指定なし')}</select> <input id="xnm" value="交流戦" style="width:7em"> <button class="s" id="xadd">追加</button>`}const Ls=G.comps.filter(x=>x.mode=='league'),lk=linkOf(c);
  ag.innerHTML=`<b>組み合わせ:</b> <button id="arr">同じ大学・同じリーグをベスト4まで避けて並べ替え</button> <label><input type="checkbox" id="sgrp" ${c.showGrp?'checked':''}> シード枠の印を編集</label><span class="mu" id="armsg"></span><div class="mu" style="flex-basis:100%">大学名はチーム名の最後のA・B・Cを除いた部分で判断します(京大A と 京大B は同じ大学)。並べ替えでは、同じ印の枠どうし(印がない枠は同じリーグ順位どうし)だけを入れ替えます。「固定」と書いた枠と「(空き)」の位置、つまりトーナメントの形は変わりません。</div>`;
  el.innerHTML=Ls.length?`<b>出場チーム:</b> リーグ戦の順位から決める → ${Ls.map(x=>`<label><input type="checkbox" data-lkl="${x.id}" ${lk.ls.includes(x.id)?'checked':''}>${esc(x.name)}</label>`).join(' ')} の <input type="number" id="lkf" min="1" max="16" value="${lk.from}">位 ～ <input type="number" id="lkt" min="1" max="16" value="${lk.to||''}" placeholder="最下位">位 を <button id="lkimp">${c.src?'取り込み直す':'取り込む'}</button>${c.src?' <button class="s" id="lkoff">連携を解除</button>':''}<div class="mu" style="flex-basis:100%">${c.src?'🔗 リーグ戦と連携中です。そのリーグの全試合の結果が入ると、「リーグ1 1位」などが実際のチーム名に変わります(日程・審判欄も自動で置きかわります)。':'例: 上位トーナメントは「1位～2位」、下位トーナメントは「3位～(空欄=最下位)」。同じ大学・同じリーグがベスト4まで当たらないように配置します(枠はあとからドラッグで変更できます)。'}</div>`:'<span class="mu">リーグ戦を作ると、その順位からトーナメントの出場チームを決められます。</span>';
  const{R}=build(c),rdy=c.rday||{};
@@ -249,16 +278,26 @@ function allM(a){return G.comps.filter(c=>a||c.inc).flatMap(c=>{const{R,M}=build
 const tsOf=m=>[tm(m.c,m.a).k,tm(m.c,m.b).k].filter(Boolean),dpOf=m=>[m.a,m.b].filter(s=>s.m&&!s.m.bye).map(s=>m.c.id+':'+s.m.no);
 function winOk(m,t,per){const dy=Math.floor(t/per)+1,st=tmin(G.start)+(t%per)*G.dur;
  if((m.c.fd&&dy<+m.c.fd)||(m.c.td&&dy>+m.c.td))return false;
- if(m.c.mode=='tour'&&m.c.rday&&m.c.rday[m.r]&&+m.c.rday[m.r]!=dy)return false;
+ if(m.c.mode=='tour'&&!m.x&&m.c.rday&&m.c.rday[m.r]&&+m.c.rday[m.r]!=dy)return false;
+ if(m.x&&m.day&&+m.day!=dy)return false;
  return(!m.c.from||st>=tmin(m.c.from))&&(!m.c.to||st+G.dur<=tmin(m.c.to))}
 function stats(cells,MG,per){const o={};for(const k in cells){const m=MG[cells[k]];if(!m)continue;const t=+k.split('-')[0],d=Math.floor(t/per)+1,r=t%per+1;for(const x of(m.ts||tsOf(m)))(o[x+'@'+d]=o[x+'@'+d]||[]).push(r)}return o}
-function assignRefs(M,per,total,keepR){keepR=keepR||{};G.refs={...keepR};const cnt={},MG={};M.forEach(m=>MG[m.g]=m);
+function assignRefs(M,per,total,keepR){keepR=keepR||{};G.refs={...keepR};const cnt={},MG={},at={},lu={};M.forEach(m=>MG[m.g]=m);for(const k in G.cells)at[G.cells[k]]=+k.split('-')[0];
+ // 勝ち上がり・敗者戦の審判: 同じ日の、直前に終わった試合の敗者(その時間に試合がないチーム)
+ // チームの「正体」を表す印: 既知のチーム(T)、試合の勝者(W)、試合の敗者(L)。3位決定戦の敗者は準決勝の敗者のどちらか
+ const ids=(c,s)=>{if(!s.m)return s.t==null?[]:['T'+c.teams[s.t]];const y=s.m;if(y.bye)return ids(c,y.a.t!=null?y.a:y.b);if(y.x)return[...ids(c,y.a),...ids(c,y.b)];return s.w?['W'+y.no]:lset(c,y)},
+  lset=(c,y)=>y.a.m&&!y.a.w&&y.b.m&&!y.b.w?[...ids(c,y.a),...ids(c,y.b)]:['L'+y.no];
+ const lateRef=(m,t,ms)=>{const d=Math.floor(t/per),busy=new Set(ms.flatMap(x=>[...ids(x.c,x.a),...ids(x.c,x.b)])),used=lu[t]||(lu[t]=new Set());
+  const ok=x=>x.c==m.c&&!x.x&&at[x.g]!=null&&at[x.g]<t&&lset(x.c,x).every(k=>!busy.has(k)&&!used.has(k)),c=M.filter(x=>ok(x)&&Math.floor(at[x.g]/per)==d).sort((a,b)=>at[b.g]-at[a.g])[0]||M.filter(ok).sort((a,b)=>at[b.g]-at[a.g])[0];
+  if(c){lset(c.c,c).forEach(k=>used.add(k));return c}return null};
+ // まだ勝敗が決まっていない枠も含めて、その試合に出る可能性のあるチーム
+ const poss=(c,s)=>s.m?(s.m.bye?[tm(c,s).k].filter(Boolean):[...poss(c,s.m.a),...poss(c,s.m.b)]):[tm(c,s).k].filter(Boolean);
  for(const g in keepR){const m=MG[g];if(m){const k=m.c.id+'|'+keepR[g];cnt[k]=(cnt[k]||0)+1}}
- for(let t=0;t<total;t++){const ms=Object.entries(G.cells).filter(([k])=>k.split('-')[0]==t).map(([,g])=>MG[g]).filter(Boolean),bz=new Set(ms.flatMap(tsOf));
+ for(let t=0;t<total;t++){const ms=Object.entries(G.cells).filter(([k])=>k.split('-')[0]==t).map(([,g])=>MG[g]).filter(Boolean),bz=new Set(ms.flatMap(m=>[...poss(m.c,m.a),...poss(m.c,m.b)]));
   ms.forEach(m=>{if(keepR[m.g]!=null)bz.add(m.c.id+'|'+keepR[m.g])});
-  ms.forEach(m=>{if(keepR[m.g]!=null)return;if(m.c.mode=='tour'&&m.r>0){G.refs[m.g]='直前試合の敗者';return}
+  ms.slice().sort((a,b)=>(b.c.mode=='tour'&&b.r>0)-(a.c.mode=='tour'&&a.r>0)).forEach(m=>{if(keepR[m.g]!=null)return;if(m.c.mode=='tour'&&m.r>0){const r=lateRef(m,t,ms);if(r){G.refs[m.g]=`第${r.no}試合の敗者`;[...poss(r.c,r.a),...poss(r.c,r.b)].forEach(k=>bz.add(k));return}}
    const p=m.c.slots.filter(x=>x!=null).map(x=>m.c.id+'|'+m.c.teams[x]).filter(k=>!bz.has(k)).sort(()=>Math.random()-.5).sort((a,b)=>(cnt[a]||0)-(cnt[b]||0))[0];
-   if(p){G.refs[m.g]=p.slice(p.indexOf('|')+1);cnt[p]=(cnt[p]||0)+1;bz.add(p)}})}}
+   if(p){G.refs[m.g]=p.slice(p.indexOf('|')+1);cnt[p]=(cnt[p]||0)+1;bz.add(p)}else if(m.c.mode=='tour'&&m.r>0)G.refs[m.g]='直前試合の敗者'})}}
 const lockedRefs=MG=>{const kr={};for(const g in G.refs)if(MG[g]&&MG[g].c.lock)kr[g]=G.refs[g];return kr};
 const pname=kd=>{const i=kd.lastIndexOf('@'),k=kd.slice(0,i),j=k.indexOf('|'),c=G.comps.find(x=>x.id==k.slice(0,j));return(c?c.name:'')+' '+k.slice(j+1)+' '+kd.slice(i+1)+'日目'};
 function refStats(cells,MG,per,refs){const o={};for(const k in cells){const m=MG[cells[k]];if(!m)continue;const n=(refs||G.refs)[m.g];if(!m.c.teams.includes(n))continue;const t=+k.split('-')[0],kd=m.c.id+'|'+n+'@'+(Math.floor(t/per)+1);(o[kd]=o[kd]||[]).push(t%per+1)}return o}
@@ -316,11 +355,15 @@ function runOpt1(M,per,total){G.pins=G.pins||{};const MG={};M.forEach(m=>{MG[m.g
  omsg=er.length?'<div id="msg">⚠ 次の指定は実現できませんでした(他の指定、コート・時間帯の制限、試合数と両立しません):<br>'+er.map(esc).join('<br>')+'<br>数字を変更して、もう一度「最適化」を押してください。</div>':'<div style="color:var(--ac)">✅ すべての指定を満たす日程になりました。</div>';
  {const ms=missing(M);if(ms.length)omsg+='<div id="msg">⚠ 審判を割り当てられない試合: '+esc(ms.map(m=>m.c.name+' 第'+m.no+'試合').join('、'))+'</div>'}
  upd()}
-function missing(M){return Object.values(G.cells).map(g=>M.find(m=>m.g==g)).filter(m=>m&&!G.refs[m.g])}
+function missing(M){return Object.values(G.cells).map(g=>M.find(m=>m.g==g)).filter(m=>m&&(!G.refs[m.g]||G.refs[m.g]=='直前試合の敗者'))}
 function gen(){const M=allM(),per=perOf(),total=per*G.days,MG={};M.forEach(m=>MG[m.g]=m);let b=null;
  const keep={};for(const k in G.cells){const m=MG[G.cells[k]];if(m&&m.c.lock)keep[k]=m.g}const keepR=lockedRefs(MG);
- for(let i=0;i<60;i++){const ov=gen1(keep,keepR);if(ov===undefined)return;const n=missing(M).length;
-  if(!b||ov<b.ov||(ov==b.ov&&n<b.n))b={ov,n,cells:{...G.cells},refs:{...G.refs}};if(!b.ov&&!b.n)break}
+ // 連戦(前の時間に試合をしたチームがすぐ次の試合)の数
+ const b2b=()=>{const at={};for(const k in G.cells)at[G.cells[k]]=+k.split('-')[0];let n=0;const by={};
+  for(const k in G.cells){const m=MG[G.cells[k]],t=+k.split('-')[0];if(!m)continue;if(dpOf(m).some(d=>at[d]===t-1&&Math.floor(at[d]/per)==Math.floor(t/per)))n++;tsOf(m).forEach(x=>(by[x]=by[x]||[]).push(t))}
+  for(const x in by){const r=by[x].sort((a,b)=>a-b);for(let j=1;j<r.length;j++)if(r[j]-r[j-1]==1&&Math.floor(r[j]/per)==Math.floor(r[j-1]/per))n++}return n};
+ for(let i=0;i<80;i++){const ov=gen1(keep,keepR,i%2==0);if(ov===undefined)return;const n=missing(M).length,bb=b2b();
+  if(!b||ov<b.ov||(ov==b.ov&&(n<b.n||(n==b.n&&bb<b.bb))))b={ov,n,bb,cells:{...G.cells},refs:{...G.refs}};if(!b.ov&&!b.n&&!b.bb)break}
  G.cells=b.cells;G.refs=b.refs;const msg=[];
  if(Object.keys(keep).length)msg.push('🔒固定した大会('+[...new Set(Object.values(keep).map(g=>MG[g].c.name))].join('・')+')はそのままにしました。');
  if(b.ov)msg.push(`時間内に入りきらない試合が${b.ov}試合あります(日数・終了時刻・コート数・試合日の指定を調整してください。審判を出せるチームが足りず組めなかった可能性もあります)。`);
@@ -328,7 +371,7 @@ function gen(){const M=allM(),per=perOf(),total=per*G.days,MG={};M.forEach(m=>MG
  const ms=missing(M);if(ms.length)msg.push('⚠ 審判を割り当てられない試合が'+ms.length+'試合あります: '+ms.map(m=>m.c.name+' 第'+m.no+'試合').join('、')+'。同じ大会の中で、その時間に試合のないチームがいません。コート数を減らす、時間枠を増やす、チームを増やすなどで調整してください。');
  $('#msg').textContent=msg.join(' ');
  if(Object.keys(G.pins||{}).length)runOpt(M,per,total);else upd()}
-function gen1(keep,keepR){const M=allM(),per=perOf(),total=per*G.days;G.cells={};G.refs={};G.pins=G.pins||{};omsg='';$('#msg').textContent='';
+function gen1(keep,keepR,strict){const M=allM(),per=perOf(),total=per*G.days;G.cells={};G.refs={};G.pins=G.pins||{};omsg='';$('#msg').textContent='';
  if(!M.length){$('#msg').textContent='日程に入れる大会を選んでください。';rSched();return}
  const MG={};M.forEach(m=>MG[m.g]=m);
  for(const k in keep||{})if(+k.split('-')[0]<total&&+k.split('-')[1]<G.courts)G.cells[k]=keep[k];
@@ -336,14 +379,14 @@ function gen1(keep,keepR){const M=allM(),per=perOf(),total=per*G.days;G.cells={}
  const at={},last={},dn={},tot={},cdn={},pl={};
  const qt=c=>{if(c.mode=='tour')return 99;const nd=Math.max(1,Math.min(G.days,+(c.td||G.days))-Math.max(1,+(c.fd||1))+1);return Math.ceil((c.teams.length-1)/nd)};M.forEach(m=>{tot[m.c.id]=(tot[m.c.id]||0)+1;dn[m.c.id]=0});
  const rs=G.rules.map(r=>{const x=G.comps.find(z=>z.id==r.c);return x&&{k:x.id+'|'+x.teams[r.t],p:r.p,d:r.d}}).filter(Boolean);
- const ts=tsOf,dp=dpOf,win=(m,t)=>winOk(m,t,per),cons=c=>c.from||c.to||c.fd||c.td||(c.rday&&Object.values(c.rday).some(Boolean));
+ const ts=tsOf,dp=dpOf,win=(m,t)=>winOk(m,t,per),cons=c=>c.from||c.to||c.fd||c.td||(c.rday&&Object.values(c.rday).some(Boolean))||(c.ex&&c.ex.length);
  for(const k in G.cells){const m=MG[G.cells[k]],t=+k.split('-')[0];at[m.g]=t;dn[m.c.id]++;ts(m).forEach(x=>{const kk=x+'@'+(Math.floor(t/per)+1);cdn[kk]=(cdn[kk]||0)+1})}
  for(let t=0;t<total&&todo.length;t++){const busy=new Set(),bcn={},ncn={};
   const refOk=m=>{const id=m.c.id,pc=pl[id]??(pl[id]=m.c.slots.filter(x=>x!=null).length);return pc-((bcn[id]||0)+ts(m).length)>=((ncn[id]||0)+((m.c.mode=='tour'&&m.r>0)?0:1))};
   for(let c=0;c<G.courts;c++){const g=G.cells[t+'-'+c];if(!g)continue;const m=MG[g];bcn[m.c.id]=(bcn[m.c.id]||0)+ts(m).length;if(!(m.c.mode=='tour'&&m.r>0))ncn[m.c.id]=(ncn[m.c.id]||0)+1;ts(m).forEach(x=>{busy.add(x);last[x]=t})}
   for(let c=0;c<G.courts;c++){if(G.cells[t+'-'+c])continue;
-   const cd=todo.filter(m=>win(m,t)&&refOk(m)&&(m.c.court===''||m.c.court==null||m.c.court==String(c))&&dp(m).every(d=>at[d]<t)&&ts(m).every(x=>!busy.has(x)));if(!cd.length)continue;
-   const sc=m=>{const x=ts(m),day=Math.floor(t/per)+1,hit=p=>x.some(y=>rs.some(r=>r.p==p&&r.k==y&&(!r.d||r.d==day)));return(cons(m.c)?-200:0)+(hit('first')?-1e4:0)+(hit('last')?1e4:0)+m.r*10+Math.random()*60+dn[m.c.id]/tot[m.c.id]*20+x.reduce((s,y)=>s+(last[y]===t-1?30:0),0)+x.reduce((s,y)=>{const n=cdn[y+'@'+day]||0;return s+n*40+(n>=qt(m.c)?300:0)},0)};
+   const cd=todo.filter(m=>win(m,t)&&refOk(m)&&(m.c.court===''||m.c.court==null||m.c.court==String(c))&&dp(m).every(d=>at[d]<t&&!(strict&&at[d]===t-1&&Math.floor(at[d]/per)==Math.floor(t/per)))&&ts(m).every(x=>!busy.has(x)&&!(strict&&last[x]===t-1)));if(!cd.length)continue;
+   const sc=m=>{const x=ts(m),day=Math.floor(t/per)+1,hit=p=>x.some(y=>rs.some(r=>r.p==p&&r.k==y&&(!r.d||r.d==day)));return(cons(m.c)?-200:0)+(hit('first')?-1e4:0)+(hit('last')?1e4:0)+m.r*10+Math.random()*60+dn[m.c.id]/tot[m.c.id]*20+x.reduce((s,y)=>s+(last[y]===t-1?30:0),0)+(dp(m).some(d=>at[d]===t-1)?40:0)+(m.third?-25:0)+x.reduce((s,y)=>{const n=cdn[y+'@'+day]||0;return s+n*40+(n>=qt(m.c)?300:0)},0)};
    cd.sort((a,b)=>sc(a)-sc(b));const m=cd[0];bcn[m.c.id]=(bcn[m.c.id]||0)+ts(m).length;if(!(m.c.mode=='tour'&&m.r>0))ncn[m.c.id]=(ncn[m.c.id]||0)+1;G.cells[t+'-'+c]=m.g;at[m.g]=t;dn[m.c.id]++;ts(m).forEach(x=>{busy.add(x);last[x]=t;const k=x+'@'+(Math.floor(t/per)+1);cdn[k]=(cdn[k]||0)+1});todo.splice(todo.indexOf(m),1)}}
  assignRefs(M,per,total,keepR);
  return todo.length}
@@ -445,6 +488,9 @@ document.addEventListener('click',e=>{const g=s=>e.target.closest(s),c=cur();if(
  else if(g('[data-add]')){newComp(g('[data-add]').dataset.add);sel=null;all()}
  else if(g('#lkimp'))importLeague(c)
  else if(g('#lkoff')){delete c.src;delete c.pend;all()}
+ else if(g('#x2d')){const d1=+$('#xd1').value,d2=+$('#xd2').value;if(!d1||!d2||d2<=d1){$('#xmsg').textContent=' 1日目と2日目を選んでください(2日目は1日目より後)。';return}const r=autoTwoDay(c,d1,d2);upd();$('#xmsg').textContent=` ✅ 敗者戦${r.p1}試合・交流戦${r.p2}試合を追加し、3位決定戦ありにしました。「② 日程」で「日程を作成」を押してください。`}
+ else if(g('#xadd')){const[am,aw]=$('#xa').value.split('|'),[bm,bw]=$('#xb').value.split('|');if(am==bm){$('#xmsg').textContent=' 別々の試合を選んでください。';return}c.ex=c.ex||[];const id='x'+(Math.max(0,...c.ex.map(x=>+x.id.slice(1)||0))+1);c.ex.push({id,a:{m:am,w:+aw},b:{m:bm,w:+bw},day:$('#xdy').value,name:$('#xnm').value.trim()||'交流戦'});upd()}
+ else if(g('[data-exdel]')){const id=g('[data-exdel]').dataset.exdel;c.ex=(c.ex||[]).filter(x=>x.id!=id);delete c.win[Object.keys(c.win).find(k=>k.endsWith('-'+id))];upd()}
  else if(g('#arr')){const n=arrange(c);upd();$('#armsg').textContent=n?' すべては避けられませんでした(下の⚠を確認してください)。':' ✅ 並べ替えました。'}
  else if(g('[data-fxclr]')){const x=G.comps.find(z=>z.id==g('[data-fxclr]').dataset.fxclr);delete x.fixed;upd()}
  else if(g('#pub')){const b=$('#pub');if(!pubArm){pubArm=true;b.textContent='もう一度押すと今のデータを上書き';setTimeout(()=>{pubArm=false;b.textContent='公開データ(data.json)を読み込む'},3500)}else{pubArm=false;loadPub(true)}}
