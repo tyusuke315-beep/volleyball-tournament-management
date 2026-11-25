@@ -51,7 +51,7 @@ details summary{cursor:pointer;color:var(--ac)}
 .champ{font-size:18px;font-weight:700;margin:6px 0;color:var(--ac)}
 .mu{color:var(--mu)}
 table{border-collapse:collapse}th,td{border:1px solid var(--ln);padding:4px 8px;text-align:center;vertical-align:top}
-.tabs{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0}.tabs button{background:var(--pn);color:var(--ink);border:1px solid var(--ln)}.tabs button.on{background:var(--ac);color:#fff}.sc{overflow-x:auto}.sc td{min-width:200px;height:74px}#pt td{min-width:0;height:auto}#pt input{width:64px}.bad{border-color:#b3261e!important;background:#fde7e5;color:#000}#cnt td{min-width:0;height:auto}#xl td{min-width:0;height:auto;white-space:nowrap}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0}.tabs button{background:var(--pn);color:var(--ink);border:1px solid var(--ln)}.tabs button.on{background:var(--ac);color:#fff}.sc{overflow-x:auto}.sc td{min-width:200px;height:74px}#pt td{min-width:0;height:auto}#pt input{width:64px}.bad{border-color:#b3261e!important;background:#fde7e5;color:#000}#cnt td{min-width:0;height:auto}#xl td{min-width:0;height:auto;white-space:nowrap}.xlp{margin-bottom:10px}.xlp.br{table-layout:fixed;margin-top:14px}#xl .xlp.br td{height:18px;overflow:visible;padding:0 2px}.xlp td{border:none;padding:1px 4px;min-width:0;height:auto}#xl h4{margin:10px 0 4px}
 .mx td{min-width:64px;height:auto;white-space:nowrap}
 .st td,.st th{min-width:0;height:auto;white-space:nowrap}
 .vs td{min-width:150px;height:auto;text-align:left}
@@ -105,7 +105,7 @@ table{border-collapse:collapse}th,td{border:1px solid var(--ln);padding:4px 8px;
 <label>コート数 <input type="number" id="courts" min="1" max="6"></label></div>
 <div class="row">条件:<select id="rt"></select>を<select id="rd"></select>の<select id="rp"><option value="first">最初の時間帯に</option><option value="last">最後の時間帯に</option></select>
 <button class="s" id="ra">追加</button><span id="rules"></span></div>
-<div class="row"><button id="gen">日程を作成</button><button class="s" id="cp">Excel形式でコピー</button><button class="s" onclick="print()">印刷</button></div>
+<div class="row"><button id="gen">日程を作成</button><button class="s" id="cp">Excel形式でコピー</button><button class="s" id="dlx">Excelファイルをダウンロード</button><button class="s" onclick="print()">印刷</button></div>
 <div class="mu">大会名の右の「日」と「時間」は「この大会を行える日・時間帯」です(空欄なら制限なし。例: 1日目 ～ 2日目、10:00 ～ 13:00)。</div>
 <div class="mu">🔒固定 にした大会は、「日程を作成」を押しても今の時間・コート・審判のまま動きません。リーグ戦の日程が決まったら固定してから押すと、トーナメントだけを組み直せます。</div>
 <div class="mu">試合カードを別の枠へドラッグで入れ替え、審判欄は直接書き換えできます。</div></div>
@@ -114,7 +114,7 @@ table{border-collapse:collapse}th,td{border:1px solid var(--ln);padding:4px 8px;
 <div class="row"><label>表示 <select id="rv"></select></label><label><input type="checkbox" id="ronly"> 結果が未入力の試合だけ</label></div>
 <div class="mu">勝ったセット数を入れると、リーグ戦は順位表に、トーナメントは次の試合に自動で反映されます。得点は同率のときの順位決め(得点率)に使います(入れなくてもかまいません)。</div>
 <div class="rs2"><div id="rlist"></div><div id="rside"></div></div></section>
-<section class="pn" data-in="view" id="vwp"><div class="row noprint" id="vtool"><button id="lkr2">閲覧用リンクを作ってコピー</button><button class="s" onclick="print()">印刷</button><span class="mu" id="lkm2"></span></div><div id="vw"></div></section>
+<section class="pn" data-in="view" id="vwp"><div class="row noprint" id="vtool"><button id="lkr2">閲覧用リンクを作ってコピー</button><button class="s" id="dlx2">Excelファイルをダウンロード</button><button class="s" onclick="print()">印刷</button><span class="mu" id="lkm2"></span></div><div id="vw"></div></section>
 <section class="pn" data-in="prep"><h2>データの書き出し・読み込み・共有</h2><div class="mu">入力内容はこのブラウザに自動保存されます。別の端末へ移すときはここを使います。</div>
 <div class="mu">共有URLにGitHubのURL(https://ユーザー名.github.io/リポジトリ名/)を入れてからリンクを作ってください。「編集用リンク」は運営スタッフ用(開いた人の画面に今の内容がそのまま入ります)、「閲覧用リンク」は参加者用(速報画面だけが見られ、開いた人のデータは上書きしません)。どちらもリンクを作った時点の内容です。</div><div class="row"><label style="flex:1">共有URL <input id="base" placeholder="https://ユーザー名.github.io/リポジトリ名/" style="width:100%"></label><button id="lk">編集用リンク</button><button id="lkr">閲覧用リンク</button></div><div class="mu" id="lkm"></div>
 <div class="row"><button class="s" id="ex">書き出し</button><button class="s" id="im">読み込み</button><button class="s" id="pub">公開データ(data.json)を読み込む</button></div><div class="mu">「公開データ」は、GitHubに置いた data.json(大会の公式データ)です。初めて開いた人には自動で表示されます。</div><textarea id="io" style="height:70px"></textarea></section>
@@ -420,7 +420,7 @@ function rSched(){const M=allM(),per=perOf();let h='';
    for(let c=0;c<G.courts;c++){const key=t+'-'+c,m=M.find(x=>x.g==G.cells[key]);
     h+=`<td data-cell="${key}">`+(m?`<div class="card" draggable="true" data-card="${key}"><small>${m.c.lock?'🔒':''}${esc(m.c.name)} 第${m.no}試合 ${lab(m.c,m,m.R)}</small><br>${vsHTML(m,'b')}<br><small>審判</small> <input data-ref="${m.g}" value="${esc(G.refs[m.g]||'')}">${refShow(m)!=(G.refs[m.g]||'')?`<br><small>→ ${esc(refShow(m).slice((G.refs[m.g]||'').length))}</small>`:''}</div>`:'')+'</td>'}
    h+='</tr>'}h+='</table></div>'}
- h+=`<h3>Excel形式(Excelにそのまま貼り付けできます)</h3><div class="sc" id="xl"><table>${xl().html}</table></div>`;
+ h+=`<h3>Excel形式(「Excel形式でコピー」で貼り付け、または「Excelファイルをダウンロード」)</h3><div class="sc" id="xl">${xlSheets().map(s=>{if(!s.br)return`<h4>${esc(s.name)}</h4><table class="xlp">${sheetHTML(s.rows)}</table>`;const W=Math.max(...s.rows.map(r=>r.length));return`<h4>${esc(s.name)}</h4><table class="xlp br" style="width:${W*46}px"><tr>${'<td style="width:46px;padding:0;height:0"></td>'.repeat(W)}</tr>${sheetHTML(s.rows.slice(2),1)}</table>`}).join('')}</div>`;
  {const cn={};G.comps.filter(c=>c.inc).forEach(c=>c.teams.forEach(t=>cn[c.id+'|'+t]={c:c.name,t,d:Array(G.days).fill(0)}));
   Object.entries(G.cells).forEach(([k,g])=>{const m=M.find(x=>x.g==g);if(!m)return;const dy=Math.floor(k.split('-')[0]/per);[m.a,m.b].forEach(s=>{const q=tm(m.c,s).k;if(q&&cn[q]&&dy<G.days)cn[q].d[dy]++})});
   h+='<h3>各チームの試合数(日別)</h3><div class="sc" id="cnt"><table><tr><th>大会</th><th>チーム</th>'+Array.from({length:G.days},(_,i)=>`<th>${i+1}日目</th>`).join('')+'<th>計</th></tr>'+Object.values(cn).map(o=>`<tr><td>${esc(o.c)}</td><td>${esc(o.t)}</td>${o.d.map(n=>`<td>${n}</td>`).join('')}<td>${o.d.reduce((a,b)=>a+b,0)}</td></tr>`).join('')+'</table></div><div class="mu">トーナメントは、対戦が確定している試合だけ数えています。</div>'}
@@ -430,25 +430,65 @@ function rSched(){const M=allM(),per=perOf();let h='';
    rw+=`<tr><td>${esc(c.name)}</td><td>${esc(t)}</td><td>${d}日目</td><td>${r?r.length:0}</td><td>${inp('f',p.f||f,f)}</td><td>${inp('l',p.l||l,l)}</td><td>${q?q.length:0}</td><td>${inp('rf',p.rf||rf,rf)}</td><td>${inp('rl',p.rl||rl,rl)}</td></tr>`}}));
   h+=`<h3>チーム別の出場順の指定</h3><div class="mu">各チームの、その日の最初と最後の試合、および審判を務める最初と最後が「第何試合目」かを書き出しています。数字を書き換えて「最適化」を押すと、その指定になるよう日程を組み直します(実現できない指定はエラーを表示します。🔒固定の大会は動かしません)。赤い欄は、まだ指定どおりになっていない欄です。日程表のカードをドラッグしたり審判欄を書き換えたあとは、「手書きの変更を反映」を押すと、この表の数字が最新になります。</div><div class="row"><button id="opt">この指定で最適化</button><button class="s" id="rfl">手書きの変更を反映</button><button class="s" id="pclr">指定をすべて解除</button></div><div id="omsg">${omsg}</div><div class="sc" id="pt"><table><tr><th>大会</th><th>チーム</th><th>日</th><th>試合数</th><th>初戦(第○試合)</th><th>最終戦(第○試合)</th><th>審判回数</th><th>審判の初回(第○試合)</th><th>審判の最終(第○試合)</th></tr>${rw}</table></div>`}
  $('#sched').innerHTML=h}
-function xl(){const M=allM(),per=perOf(),rows=[];let h='';const cn=c=>String.fromCharCode(65+c)+'コート',cs=Array.from({length:G.courts},(_,c)=>c);
- for(let d=0;d<G.days;d++){rows.push([d+1+'日目']);h+=`<tr><td colspan="${2+5*G.courts}" style="text-align:left;font-weight:700">${d+1}日目</td></tr>`;
-  rows.push(['','',...cs.flatMap(c=>['グループ',cn(c),'','','審判'])]);h+='<tr><td></td><td></td>'+cs.map(c=>`<td>グループ</td><td colspan="3">${cn(c)}</td><td>審判</td>`).join('')+'</tr>';
-  for(let k=0;k<per;k++){const t=d*per+k,r=[hm(tmin(G.start)+k*G.dur)+'～','第'+(k+1)+'試合'];
-   cs.forEach(c=>{const m=M.find(x=>x.g==G.cells[t+'-'+c]),sc=m&&scoreOf(m);r.push(...(m?[m.c.name+' '+lab(m.c,m,m.R),tm(m.c,m.a).n,sc?sc.join('-'):'vs',tm(m.c,m.b).n,refShow(m)]:['','','','','']))});
-   rows.push(r);h+='<tr>'+r.map(x=>`<td>${esc(x)}</td>`).join('')+'</tr>'}}
- // リーグ戦の結果(順位表・星取表)とトーナメントの順位
- const push=(r,b)=>{rows.push(r);h+='<tr>'+r.map(x=>`<td${b?' style="font-weight:700;text-align:left"':''}>${esc(x)}</td>`).join('')+'</tr>'};
- const Ls=G.comps.filter(c=>c.mode=='league');if(Ls.length){push([]);push(['リーグ戦の結果'],1)}
- Ls.forEach(c=>{const S=standings(c);push([]);push([c.name+(S.manual?'(最終順位)':S.done?'(確定)':`(暫定・残り${S.left}試合)`)],1);
-  const bare=S.manual&&!S.L.some(o=>o.g);push(bare?['順位','チーム']:['順位','チーム','試合','勝','敗','取セット','失セット','セット率','得点','失点','得点率']);
-  const f=x=>x===Infinity?'MAX':x.toFixed(3);S.L.forEach(o=>push(bare?[o.rank,o.n]:[o.rank,o.n,o.g,o.w,o.l,o.sw,o.sl,o.g?f(o.sr):'',o.pw,o.pl,o.g&&(o.pw||o.pl)?f(o.pr):'']));
-  if(S.L.some(o=>o.g)){const ids=S.L.map(o=>o.i);push(['星取表','',...ids.map(i=>c.teams[i])]);ids.forEach(i=>push([c.teams[i],'',...ids.map(j=>{if(i==j)return'—';const r=getRes(c,i,j);return r?(r[0]>r[1]?'○':'●')+r[0]+'-'+r[1]:''})]))}});
- const Ts=G.comps.filter(c=>c.mode=='tour'&&tourRanks(c).length);if(Ts.length){push([]);push(['トーナメントの順位'],1)}
- Ts.forEach(c=>{push([c.name],1);tourRanks(c).forEach(x=>push([(x.ns.length>1?'同率':'')+x.p+'位',x.ns.join('・')]))});
- return{rows,html:h}}
-async function cp(){const{rows,html}=xl(),tsv=rows.map(r=>r.join('\t')).join('\n'),ok=()=>$('#msg').textContent='コピーしました。Excelに貼り付けできます。';
- try{await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob(['<table border="1">'+html+'</table>'],{type:'text/html'}),'text/plain':new Blob([tsv],{type:'text/plain'})})]);ok()}
+/* ---------- Excel ---------- */
+// セル: 文字列 か {v, b:太字, al:寄せ, span:横に結合する列数, sm:小さい字, L/B/T/R:罫線('n'=細線, 'r'=勝ち上がりの赤い太線)}
+const BOX={L:'n',B:'n',T:'n',R:'n'},bx=v=>({v,...BOX}),bh=v=>({v,b:1,...BOX});
+// 縦向きのトーナメント表(下にチーム名、上に向かって勝ち上がり、いちばん上が決勝)
+function bracketRows(c){const{R,M}=build(c);M.forEach(m=>{m.c=c;m.R=R});const L=R.length,fin=R[L-1]&&R[L-1].find(m=>!m.third),out=[[{v:c.name,b:1}],[]];if(!fin)return out;
+ const leaves=[],node=s=>{if(s.m&&!s.m.bye)return mk(s.m);const t=s.m?(s.m.a.t??s.m.b.t):s.t,lf={leaf:1,n:t==null?'(空き)':c.teams[t]};leaves.push(lf);return lf},mk=m=>{const A=node(m.a),B=node(m.b);return{m,A,B}};
+ const root=mk(fin);leaves.forEach((l,i)=>{l.x=2*i+1;l.h=1});
+ const lay=n=>{if(n.leaf)return;lay(n.A);lay(n.B);n.h=Math.max(n.A.h,n.B.h)+1;n.x=Math.floor((n.A.x+n.B.x)/2)};lay(root);
+ // 1つの回戦を RP 行で描く(線は各ブロックの最終行の下)
+ const RP=2,H=root.h,W=2*leaves.length,top=k=>(H+1-k)*RP,rr=k=>top(k)+RP-1,NR=(H+1)*RP+1,g=[...Array(NR)].map(()=>[...Array(W)].map(()=>({v:''}))),st=(r,q,k,v)=>{if(g[r][q][k]!=='r')g[r][q][k]=v};
+ const walk=n=>{if(n.leaf)return;walk(n.A);walk(n.B);const k=n.h,w=c.win[n.m.r+'-'+n.m.i],r=rr(k);
+  [['a',n.A],['b',n.B]].forEach(([sd,X])=>{const f=w==sd?'r':'n';for(let lv=X.h;lv<k;lv++)for(let q=0;q<RP;q++)st(top(lv)+q,X.x,'L',f);const[c0,c1]=sd=='a'?[n.A.x,n.x]:[n.x,n.B.x];for(let q=c0;q<c1;q++)st(r,q,'B',f)});
+  Object.assign(g[r][n.x-1],{v:'第'+n.m.no+'試合',al:'right',sm:1});const sc=scoreOf(n.m);if(sc)Object.assign(g[r][n.x],{v:sc.join('-'),al:'left',sm:1})};
+ walk(root);const fw=c.win[fin.r+'-'+fin.i];for(let q=0;q<RP;q++)st(q,root.x,'L',fw?'r':'n');if(fw)Object.assign(g[0][root.x],{v:'優勝 '+tm(c,fin[fw]).n,al:'left',b:1});
+ g[NR-1]=[];leaves.forEach((l,i)=>{g[NR-1].push({v:l.n,span:2,al:'center',b:1,nm:1,...BOX},null)});g.forEach(r=>r.forEach(x=>{if(x)x.ab=1}));out.push(...g);
+ // 3位決定戦・順位決定戦と順位
+ const X=M.filter(m=>m.third||m.x);if(X.length){const sp=(o,n)=>[{...o,span:n},...Array(n-1).fill(null)];
+  out.push([],[{v:'そのほかの試合',b:1}],[...sp(bh('試合'),2),...sp(bh('名前'),4),...sp(bh('対戦・結果'),10)]);
+  X.forEach(m=>{const sc=scoreOf(m);out.push([...sp(bx('第'+m.no+'試合'),2),...sp(bx(lab(m.c,m,m.R)),4),...sp(bx(tm(c,m.a).n),4),...sp({...bx(sc?sc.join('-'):'vs'),al:'center'},2),...sp(bx(tm(c,m.b).n),4)])})}
+ const rk=tourRanks(c),sp2=(o,n)=>[{...o,span:n},...Array(n-1).fill(null)];if(rk.length){out.push([],[{v:'順位',b:1}],[...sp2(bh('順位'),2),...sp2(bh('チーム'),6)]);rk.forEach(x=>out.push([...sp2(bx((x.ns.length>1?'同率':'')+x.p+'位'),2),...sp2(bx(x.ns.join('・')),6)]))}
+ return out}
+function xlSheets(){const M=allM(),per=perOf(),S=[],cn=c=>String.fromCharCode(65+c)+'コート',cs=[...Array(G.courts).keys()];
+ if(Object.keys(G.cells).length){const rows=[];
+  for(let d=0;d<G.days;d++){const rs=[];for(let k=0;k<per;k++){const t=d*per+k;if(!cs.some(c=>G.cells[t+'-'+c]))continue;const r=[hm(tmin(G.start)+k*G.dur)+'～','第'+(k+1)+'試合'];
+    cs.forEach(c=>{const m=M.find(x=>x.g==G.cells[t+'-'+c]),sc=m&&scoreOf(m);r.push(...(m?[m.c.name+' '+lab(m.c,m,m.R),tm(m.c,m.a).n,sc?sc.join('-'):'vs',tm(m.c,m.b).n,refShow(m)]:['','','','','']))});rs.push(r.map(bx))}
+   if(!rs.length)continue;rows.push([{v:d+1+'日目',b:1}],[bh('時間'),bh(''),...cs.flatMap(c=>[bh('大会'),{...bh(cn(c)),span:3},null,null,bh('審判')])],...rs,[])}
+  S.push({name:'日程',rows})}
+ const Ls=G.comps.filter(c=>c.mode=='league');if(Ls.length){const rows=[];
+  Ls.forEach(c=>{const S2=standings(c),bare=S2.manual&&!S2.L.some(o=>o.g),f=x=>x===Infinity?'MAX':x.toFixed(3);rows.push([{v:c.name+(S2.manual?'(最終順位)':S2.done?'(確定)':`(暫定・残り${S2.left}試合)`),b:1}]);
+   rows.push((bare?['順位','チーム']:['順位','チーム','試合','勝','敗','取セット','失セット','セット率','得点','失点','得点率']).map(bh));
+   S2.L.forEach(o=>rows.push((bare?[o.rank,o.n]:[o.rank,o.n,o.g,o.w,o.l,o.sw,o.sl,o.g?f(o.sr):'',o.pw,o.pl,o.g&&(o.pw||o.pl)?f(o.pr):'']).map(bx)));
+   if(S2.L.some(o=>o.g)){const ids=S2.L.map(o=>o.i);rows.push([],[bh('星取表'),...ids.map(i=>bh(c.teams[i]))]);ids.forEach(i=>rows.push([bh(c.teams[i]),...ids.map(j=>{if(i==j)return bx('—');const r=getRes(c,i,j);return bx(r?(r[0]>r[1]?'○':'●')+r[0]+'-'+r[1]:'')})]))}
+   rows.push([])});S.push({name:'リーグ戦の結果',rows})}
+ G.comps.filter(c=>c.mode=='tour').forEach(c=>S.push({name:c.name,rows:bracketRows(c),br:1}));
+ return S}
+const cellCss=x=>{const bd=k=>x[k]?`border-${{L:'left',B:'bottom',T:'top',R:'right'}[k]}:${x[k]=='r'?'2px solid #c00':'1px solid #000'};`:'';
+ return`${bd('L')}${bd('B')}${bd('T')}${bd('R')}text-align:${x.al||'left'};${x.b?'font-weight:700;':''}${x.sm?'font-size:9pt;':''}white-space:nowrap`};
+// ab: 画面の見本では、文字で列幅が広がらないように重ねて表示(Excelへの貼り付けでは普通のセル)
+const sheetHTML=(rows,pv)=>rows.map(r=>'<tr>'+(r.length?r.map(x=>x===null?'':typeof x=='object'?`<td${x.span?` colspan="${x.span}"`:''} style="${cellCss(x)}${pv&&x.ab?';position:relative':''}${pv&&x.nm?';height:28px':''}">${pv&&x.ab&&x.v?`<span style="position:absolute;top:${x.nm?5:1}px;${x.al=='right'?'right:2px':x.al=='center'?'left:0;right:0;text-align:center':'left:2px'}">${esc(x.v)}</span>`:esc(x.v??'')}</td>`:`<td>${esc(x)}</td>`).join(''):'<td></td>')+'</tr>').join('');
+const xlTSV=S=>S.flatMap(s=>[[s.name],[],...s.rows,[]]).map(r=>r.map(x=>x===null?'':typeof x=='object'?String(x.v??''):String(x)).join('\t')).join('\n');
+async function cp(){const S=xlSheets(),html='<table>'+S.map(s=>`<tr><td style="font-weight:700;font-size:13pt">${esc(s.name)}</td></tr><tr><td></td></tr>`+sheetHTML(s.rows)+'<tr><td></td></tr>').join('')+'</table>',tsv=xlTSV(S),ok=()=>$('#msg').textContent='コピーしました。Excelに貼り付けできます。';
+ try{await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([html],{type:'text/html'}),'text/plain':new Blob([tsv],{type:'text/plain'})})]);ok()}
  catch(e){try{await navigator.clipboard.writeText(tsv);ok()}catch(e2){$('#msg').textContent='自動コピーできませんでした。下の「Excel形式」の表を範囲選択してコピーしてください。'}}}
+// Excelファイル(.xlsx)。シートごとにA4縦・横幅を1ページに合わせて印刷
+const XLJS='https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';
+const loadXL=()=>window.ExcelJS?Promise.resolve(true):new Promise(res=>{const s=document.createElement('script');s.src=XLJS;s.onload=()=>res(!!window.ExcelJS);s.onerror=()=>res(false);document.head.appendChild(s)});
+async function dlx(){const say=t=>{$('#msg').textContent=t;$('#lkm2').textContent=t};say('Excelファイルを作っています…');
+ if(!await loadXL()){say('Excelファイルを作る部品を読み込めませんでした(インターネットにつながっているか確認してください)。「Excel形式でコピー」なら使えます。');return}
+ try{const wb=new ExcelJS.Workbook(),used=new Set(),ln=k=>k=='r'?{style:'medium',color:{argb:'FFCC0000'}}:{style:'thin',color:{argb:'FF000000'}};
+  xlSheets().forEach(sh=>{let nm=String(sh.name).replace(/[\[\]:*?\/\\]/g,'').slice(0,31)||'シート',k=2;while(used.has(nm))nm=nm.slice(0,28)+'('+k++ +')';used.add(nm);
+   const ws=wb.addWorksheet(nm,{pageSetup:{paperSize:9,orientation:'portrait',fitToPage:true,fitToWidth:1,fitToHeight:0,horizontalCentered:true,margins:{left:.4,right:.4,top:.5,bottom:.5,header:.3,footer:.3}}});
+   const wid=[];sh.rows.forEach((r,i)=>{let j=0;r.forEach(x=>{if(x===null)return;const o=typeof x=='object'?x:{v:x},v=o.v??'',span=o.span||1,num=typeof v=='number'||(/^-?\d+(\.\d+)?$/.test(v)&&!/^0\d/.test(v));
+    for(let q=0;q<span;q++){const cell=ws.getCell(i+1,j+q+1),b={};if(o.L&&q==0)b.left=ln(o.L);if(o.R&&q==span-1)b.right=ln(o.R);if(o.B)b.bottom=ln(o.B);if(o.T)b.top=ln(o.T);if(Object.keys(b).length)cell.border=b}
+    const cell=ws.getCell(i+1,j+1);cell.value=v===''?null:num?+v:v;cell.font={bold:!!o.b,size:o.sm?9:11,name:'游ゴシック'};cell.alignment={horizontal:o.al||(sh.br?'left':'center'),vertical:'middle',wrapText:!!o.nm};
+    if(span>1)ws.mergeCells(i+1,j+1,i+1,j+span);if(span==1&&!sh.br){const w=[...String(v)].reduce((a,ch)=>a+(ch.charCodeAt(0)>255?2:1),0);wid[j]=Math.max(wid[j]||6,Math.min(30,w+2))}j+=span})});
+   if(sh.br){for(let q=1;q<=Math.max(2,ws.columnCount);q++)ws.getColumn(q).width=5.5;sh.rows.forEach((r,i)=>{if(r.some(x=>x&&x.nm))ws.getRow(i+1).height=30})}else wid.forEach((w,q)=>{if(w)ws.getColumn(q+1).width=w})});
+  const buf=await wb.xlsx.writeBuffer(),url=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})),a=document.createElement('a');
+  a.href=url;a.download='大会_日程と結果.xlsx';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);say('Excelファイルをダウンロードしました(日程・リーグ戦の結果・トーナメント表。印刷はA4縦)。')}
+ catch(e){say('Excelファイルを作れませんでした: '+e.message)}}
 
 /* ---------- 結果入力・速報 ---------- */
 function rRes(){const s=$('#rv'),v0=G.rv||'cur',c0=cur();
@@ -544,6 +584,7 @@ document.addEventListener('click',e=>{const g=s=>e.target.closest(s),c=cur();if(
  else if(g('#ex')){const j=JSON.stringify(G);$('#io').value=j;$('#io').select();try{navigator.clipboard.writeText(j);$('#lkm').textContent='書き出して、コピーしました。別の画面で「読み込み」の枠に貼り付けてください。'}catch(e){}}
  else if(g('#im')){try{const o=JSON.parse($('#io').value);Object.keys(G).forEach(k=>delete G[k]);Object.assign(G,o);all()}catch(x){$('#msg').textContent='読み込めませんでした。書き出したデータを貼り付けてください。'}}
  else if(g('#cp'))cp()
+ else if(g('#dlx')||g('#dlx2'))dlx()
  else if(g('[data-win]')&&!(sel!=null&&g('[data-slot]'))){const[k,sd]=g('[data-win]').dataset.win.split('|');c.win[k]=c.win[k]==sd?undefined:sd;upd()}
  else if(g('[data-slot]')&&sel!=null){place(c,sel,+g('[data-slot]').dataset.slot,false);sel=null;upd()}
  else if(g('[data-t]')){const t=+g('[data-t]').dataset.t;sel=sel===t?null:t;rPool()}});
